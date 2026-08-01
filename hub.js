@@ -77,8 +77,6 @@ function startHub(port = 5000, opts = {}) {
     } else {
       socket.emit('agent-list', [...agents.values()]);
       socket.emit('repo-info', info);
-      socket.on('check-update', () => refresh());
-      socket.on('trigger-update', () => broadcastUpdate());
     }
   });
 

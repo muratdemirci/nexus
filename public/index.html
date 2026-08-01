@@ -48,8 +48,6 @@
   <div class="repo-bar" id="repoBar">
     <span class="commit" id="commitText">—</span>
     <span id="updateBadge" style="display:none" class="update">● güncelleme var</span>
-    <button id="checkBtn">Kontrol Et</button>
-    <button id="updateBtn">Güncelle</button>
   </div>
 </div>
 
@@ -121,9 +119,6 @@ socket.on('repo-info', (i) => {
 socket.on('update-status', ({from, stage, msg}) => {
   logEntry(from, `${stage}: ${msg}`, stage === 'error');
 });
-
-document.getElementById('checkBtn').onclick = () => socket.emit('check-update');
-document.getElementById('updateBtn').onclick = () => { if (confirm('Tüm cihazlara güncelleme dağıtılsın mı?')) socket.emit('trigger-update'); };
 </script>
 </body>
 </html>
