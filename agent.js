@@ -22,7 +22,7 @@ function startAgent(hubUrl = 'http://localhost:5000', name = '', intervalMs = 20
     timer = setInterval(async () => {
       try {
         const [cpu, mem, fs] = await Promise.all([si.currentLoad(), si.mem(), si.fsSize()]);
-        const disk = (fs.find((d) => d.mount === 'C:' || d.mount === '/') || fs[0] || {});
+        const disk = (fs.find((d) => ['/', 'C:', '/System/Volumes/Data'].includes(d.mount)) || fs[0] || {});
         socket.emit('stats', {
           cpu: Math.round(cpu.currentLoad || 0),
           ram: Math.round((mem.active / mem.total) * 100),
