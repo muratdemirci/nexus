@@ -3,7 +3,10 @@ const path = require('path');
 
 function run(cmd, cwd) {
   return new Promise((res, rej) => {
-    exec(cmd, { cwd, maxBuffer: 10 * 1024 * 1024 }, (e, out) => (e ? rej(e) : res(out.stdout.trim())));
+    exec(cmd, { cwd, maxBuffer: 10 * 1024 * 1024 }, (e, stdout) => {
+      if (e) return rej(e);
+      res(stdout.trim());
+    });
   });
 }
 
