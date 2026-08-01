@@ -9,6 +9,8 @@
     "agent": "node index.js --mode agent --hub http://localhost:5000"
   },
   "dependencies": {
+    "@xterm/addon-fit": "^0.11.0",
+    "@xterm/xterm": "^6.0.0",
     "cors": "^2.8.5",
     "express": "^4.19.2",
     "node-pty": "^1.1.0",

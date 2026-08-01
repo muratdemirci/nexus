@@ -20,6 +20,8 @@ function startHub(port = 5000, opts = {}) {
 
   app.use(express.json());
   app.use(express.static(path.join(__dirname, 'public')));
+  app.use('/xterm', express.static(path.join(__dirname, 'node_modules', '@xterm', 'xterm')));
+  app.use('/xterm-addon-fit', express.static(path.join(__dirname, 'node_modules', '@xterm', 'addon-fit')));
 
   app.post('/webhook', (req, res) => {
     if (req.body && req.body.ref === `refs/heads/${branch}`) broadcastUpdate();

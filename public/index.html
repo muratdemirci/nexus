@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>NEXUS</title>
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/css/xterm.css">
+<link rel="stylesheet" href="/xterm/css/xterm.css">
 <style>
   :root { --bg:#0a0e14; --panel:#0f1623; --border:#1c2738; --text:#c5d0e0; --dim:#5a6a85; --accent:#4cc9f0; --green:#4ade80; --yellow:#facc15; --red:#f87171; }
   * { margin:0; padding:0; box-sizing:border-box; }
@@ -87,8 +87,8 @@
   </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/lib/xterm.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@xterm/xterm-addon-fit@0.10.0/lib/xterm-addon-fit.min.js"></script>
+<script src="/xterm/lib/xterm.js"></script>
+<script src="/xterm-addon-fit/lib/addon-fit.js"></script>
 <script src="/socket.io/socket.io.js"></script>
 <script>
 const socket = io({ query: { type: 'browser' } });
