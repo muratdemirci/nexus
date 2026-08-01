@@ -1,0 +1,28 @@
+{
+  "name": "nexus",
+  "version": "1.0.0",
+  "description": "Nexus - Unified Home Server & Agent Device Management System",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "hub": "node index.js --mode hub",
+    "agent": "node index.js --mode agent --hub http://localhost:5000"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.19.2",
+    "socket.io": "^4.7.5",
+    "socket.io-client": "^4.7.5",
+    "systeminformation": "^5.23.5"
+  },
+  "keywords": [
+    "nexus",
+    "iot",
+    "home-automation",
+    "sysadmin",
+    "remote-terminal",
+    "device-monitoring"
+  ],
+  "author": "Nexus Team",
+  "license": "MIT"
+}
