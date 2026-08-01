@@ -2,7 +2,7 @@ const { io } = require('socket.io-client');
 const os = require('os');
 const si = require('systeminformation');
 const dns = require('dns').promises;
-const { spawn } = require('child_process');
+const pty = require('node-pty');
 const { git, restart } = require('./utils');
 
 function gb(bytes) { return +(bytes / 1073741824).toFixed(1); }
@@ -107,39 +107,40 @@ function startAgent(hubUrl = 'http://localhost:5000', name = '', intervalMs = 20
       }
     }
 
-    // ===== Terminal =====
+    // ===== Terminal (real PTY via node-pty) =====
     socket.on('term-init', ({ termId, cols, rows }) => {
-      const shell = isWin ? 'powershell.exe' : '/bin/bash';
-      const args = isWin ? ['-NoLogo'] : ['-i'];
+      const shell = isWin ? 'powershell.exe' : (process.env.SHELL || '/bin/bash');
+      const args = isWin ? ['-NoLogo'] : [];
       try {
-        const child = spawn(shell, args, {
-          env: { ...process.env, TERM: 'xterm-256color', COLUMNS: String(cols || 80), LINES: String(rows || 24) },
+        const term = pty.spawn(shell, args, {
+          name: 'xterm-256color',
+          cols: cols || 80,
+          rows: rows || 24,
           cwd: os.homedir(),
+          env: { ...process.env, TERM: 'xterm-256color' },
         });
-        child.stdout.setEncoding('utf8');
-        child.stderr.setEncoding('utf8');
-        shells.set(termId, child);
-        child.stdout.on('data', d => socket.emit('term-output', { termId, data: d }));
-        child.stderr.on('data', d => socket.emit('term-output', { termId, data: d }));
-        child.on('exit', () => { socket.emit('term-exit', { termId }); shells.delete(termId); });
-        child.on('error', (e) => socket.emit('term-output', { termId, data: `\r\n\x1b[31m${e.message}\x1b[0m\r\n` }));
+        shells.set(termId, term);
+        term.onData(d => socket.emit('term-output', { termId, data: d }));
+        term.onExit(() => { socket.emit('term-exit', { termId }); shells.delete(termId); });
+        socket.emit('term-output', { termId, data: `\x1b[36m=== Nexus Terminal: ${hostname} ===\x1b[0m\r\n` });
       } catch (e) {
         socket.emit('term-output', { termId, data: `\r\n\x1b[31mShell hatası: ${e.message}\x1b[0m\r\n` });
       }
     });
 
     socket.on('term-input', ({ termId, data }) => {
-      const child = shells.get(termId);
-      if (child) { try { child.stdin.write(data); } catch {} }
+      const term = shells.get(termId);
+      if (term) { try { term.write(data); } catch {} }
     });
 
     socket.on('term-resize', ({ termId, cols, rows }) => {
-      // best-effort; no PTY so resize is advisory
+      const term = shells.get(termId);
+      if (term) { try { term.resize(cols, rows); } catch {} }
     });
 
     socket.on('term-close', ({ termId }) => {
-      const child = shells.get(termId);
-      if (child) { try { child.kill(); } catch {} shells.delete(termId); }
+      const term = shells.get(termId);
+      if (term) { try { term.kill(); } catch {} shells.delete(termId); }
     });
 
     // ===== Auto-update =====
