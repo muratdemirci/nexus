@@ -12,7 +12,7 @@ function startAgent(hubUrl = 'http://localhost:5000', name = '', intervalMs = 20
   const repoDir = opts.repoDir || __dirname;
   const isWin = os.platform() === 'win32';
 
-  // Get IP
+  // Collect ALL static info first, THEN connect (avoid race with handshake)
   const ip = (() => {
     for (const ifaces of Object.values(os.networkInterfaces())) {
       for (const i of ifaces) if (!i.internal && i.family === 'IPv4') return i.address;
@@ -20,39 +20,49 @@ function startAgent(hubUrl = 'http://localhost:5000', name = '', intervalMs = 20
     return '';
   })();
 
-  // Collect static info, THEN connect
-  let staticInfo = {};
-  si.system().then(s => staticInfo.manufacturer = s.manufacturer).catch(()=>{});
-  si.cpu().then(c => { staticInfo.cpuModel = c.brand || c.manufacturer; staticInfo.cpuCores = c.cores; }).catch(()=>{});
-  si.osInfo().then(o => { staticInfo.osDistro = o.distro; staticInfo.osArch = o.arch; }).catch(()=>{});
-  si.mem().then(m => { staticInfo.ramTotal = gb(m.total); }).catch(()=>{});
+  Promise.all([
+    si.system().catch(() => ({})),
+    si.cpu().catch(() => ({})),
+    si.osInfo().catch(() => ({})),
+    si.mem().catch(() => ({})),
+  ]).then(([sys, cpu, osInfo, mem]) => {
+    const staticInfo = {
+      manufacturer: sys.manufacturer || '',
+      cpuModel: cpu.brand || cpu.manufacturer || '',
+      cpuCores: cpu.cores || '',
+      osDistro: osInfo.distro || '',
+      osArch: osInfo.arch || '',
+      ramTotal: gb(mem.total),
+    };
+    startSocket(staticInfo);
+  }).catch(() => startSocket({}));
 
-  setTimeout(() => {
-    const socket = io(hubUrl, {
-      query: { type: 'agent', hostname, platform: os.platform(), ip, ...staticInfo }
-    });
-    let timer = null;
-    let netTimer = null;
-    let prevNet = null;
-    let netOnline = false;
+  function startSocket(staticInfo) {
+  const socket = io(hubUrl, {
+    query: { type: 'agent', hostname, platform: os.platform(), ip, ...staticInfo }
+  });
+  let timer = null;
+  let netTimer = null;
+  let prevNet = null;
+  let netOnline = false;
 
-    // Terminal sessions: termId -> child process
-    const shells = new Map();
+  // Terminal sessions: termId -> child process
+  const shells = new Map();
 
-    socket.on('connect', () => {
-      console.log(`[Agent] Hub: ${socket.id}`);
-      timer = setInterval(() => report(socket), intervalMs);
-      netTimer = setInterval(() => checkInternet(socket), 10000);
-      checkInternet(socket); // immediate first check
-    });
+  socket.on('connect', () => {
+    console.log(`[Agent] Hub: ${socket.id}`);
+    timer = setInterval(() => report(socket), intervalMs);
+    netTimer = setInterval(() => checkInternet(socket), 10000);
+    checkInternet(socket); // immediate first check
+  });
 
-    socket.on('disconnect', () => {
-      if (timer) clearInterval(timer);
-      if (netTimer) clearInterval(netTimer);
-      for (const [, child] of shells) { try { child.kill(); } catch {} }
-      shells.clear();
-      console.log('[Agent] bağlantı koptu, tekrar deneniyor...');
-    });
+  socket.on('disconnect', () => {
+    if (timer) clearInterval(timer);
+    if (netTimer) clearInterval(netTimer);
+    for (const [, child] of shells) { try { child.kill(); } catch {} }
+    shells.clear();
+    console.log('[Agent] bağlantı koptu, tekrar deneniyor...');
+  });
 
     // Periodic stats including network throughput
     async function report(socket) {
@@ -150,7 +160,7 @@ function startAgent(hubUrl = 'http://localhost:5000', name = '', intervalMs = 20
         socket.emit('update-status', { stage: 'error', msg: e.message });
       }
     });
-  }, 500);
+  } // end startSocket
 }
 
 module.exports = { startAgent };
