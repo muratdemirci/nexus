@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>NEXUS</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/css/xterm.css">
 <style>
   :root { --bg:#0a0e14; --panel:#0f1623; --border:#1c2738; --text:#c5d0e0; --dim:#5a6a85; --accent:#4cc9f0; --green:#4ade80; --yellow:#facc15; --red:#f87171; }
   * { margin:0; padding:0; box-sizing:border-box; }
@@ -14,38 +15,50 @@
   .repo-bar { display:flex; align-items:center; gap:14px; font-size:13px; }
   .repo-bar .commit { font-family:monospace; background:var(--bg); padding:4px 8px; border-radius:4px; border:1px solid var(--border); }
   .repo-bar .update { color:var(--green); animation:pulse 1.5s infinite; }
-  .repo-bar button { background:var(--accent); color:var(--bg); border:none; padding:8px 16px; border-radius:6px; font-weight:600; cursor:pointer; font-size:13px; }
-  .repo-bar button:hover { opacity:0.85; }
   @keyframes pulse { 50% { opacity:0.5; } }
   .layout { display:grid; grid-template-columns:1fr 340px; gap:20px; padding:20px 28px; }
   @media (max-width:900px) { .layout { grid-template-columns:1fr; } }
-  .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:16px; }
-  .card { background:var(--panel); border:1px solid var(--border); border-radius:10px; padding:18px; transition:border-color .2s; }
-  .card.online { border-left:3px solid var(--green); }
-  .card.offline { opacity:0.5; border-left:3px solid var(--dim); }
-  .card h3 { font-size:15px; margin-bottom:4px; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(340px,1fr)); gap:16px; }
+  .card { background:var(--panel); border:1px solid var(--border); border-radius:10px; padding:18px; border-left:3px solid var(--green); position:relative; }
+  .card .net-badge { position:absolute; top:14px; right:14px; font-size:11px; padding:2px 8px; border-radius:10px; font-weight:600; }
+  .card .net-online { background:rgba(74,222,128,.15); color:var(--green); }
+  .card .net-offline { background:rgba(248,113,113,.15); color:var(--red); }
+  .card h3 { font-size:15px; margin-bottom:2px; padding-right:80px; }
   .card .sub { color:var(--dim); font-size:12px; margin-bottom:14px; }
-  .bars { display:flex; flex-direction:column; gap:10px; }
+  .card .sysinfo { font-size:11px; color:var(--dim); margin-bottom:12px; line-height:1.7; }
+  .card .sysinfo span { color:var(--text); }
+  .bars { display:flex; flex-direction:column; gap:8px; margin-bottom:12px; }
   .bar { display:flex; align-items:center; gap:8px; font-size:12px; }
   .bar .label { width:34px; color:var(--dim); }
   .bar .track { flex:1; height:7px; background:var(--bg); border-radius:4px; overflow:hidden; }
   .bar .fill { height:100%; border-radius:4px; transition:width .5s; background:var(--accent); }
-  .bar .val { width:38px; text-align:right; font-family:monospace; }
-  .card .uptime { margin-top:12px; font-size:11px; color:var(--dim); }
+  .bar .val { width:72px; text-align:right; font-family:monospace; color:var(--dim); }
+  .card .footer { display:flex; justify-content:space-between; align-items:center; font-size:11px; color:var(--dim); }
+  .term-btn { background:var(--accent); color:var(--bg); border:none; padding:5px 12px; border-radius:5px; font-weight:600; cursor:pointer; font-size:12px; }
+  .term-btn:hover { opacity:.85; }
   .side { display:flex; flex-direction:column; gap:16px; }
   .log { background:var(--panel); border:1px solid var(--border); border-radius:10px; padding:16px; }
   .log h3 { font-size:13px; letter-spacing:1px; color:var(--dim); margin-bottom:10px; }
-  .log-body { font-family:monospace; font-size:12px; max-height:420px; overflow-y:auto; display:flex; flex-direction:column-reverse; gap:3px; }
+  .log-body { font-family:monospace; font-size:12px; max-height:500px; overflow-y:auto; display:flex; flex-direction:column-reverse; gap:3px; }
   .log-body .entry { color:var(--dim); word-break:break-word; }
   .log-body .entry .from { color:var(--accent); }
   .log-body .entry.error { color:var(--red); }
-  .empty { color:var(--dim); text-align:center; padding:60px 20px; grid-column:1/-1; font-size:13px; }
+  .empty { color:var(--dim); text-align:center; padding:60px 20px; grid-column:1/-1; }
+  /* Terminal modal */
+  .modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.7); z-index:100; justify-content:center; align-items:center; }
+  .modal-overlay.active { display:flex; }
+  .modal { background:var(--panel); border:1px solid var(--border); border-radius:10px; width:90vw; max-width:900px; }
+  .modal-head { display:flex; justify-content:space-between; align-items:center; padding:12px 18px; border-bottom:1px solid var(--border); }
+  .modal-head h3 { font-size:14px; }
+  .modal-head button { background:none; border:none; color:var(--dim); font-size:20px; cursor:pointer; }
+  .modal-head button:hover { color:var(--red); }
+  #termContainer { padding:12px; height:500px; }
 </style>
 </head>
 <body>
 <div class="topbar">
   <h1>N E X <span>U S</span></h1>
-  <div class="repo-bar" id="repoBar">
+  <div class="repo-bar">
     <span class="commit" id="commitText">—</span>
     <span id="updateBadge" style="display:none" class="update">● güncelleme var</span>
   </div>
@@ -63,6 +76,19 @@
   </div>
 </div>
 
+<!-- Terminal Modal -->
+<div class="modal-overlay" id="termModal">
+  <div class="modal">
+    <div class="modal-head">
+      <h3 id="termTitle">Terminal</h3>
+      <button id="termClose">×</button>
+    </div>
+    <div id="termContainer"></div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/lib/xterm.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@xterm/xterm-addon-fit@0.10.0/lib/xterm-addon-fit.min.js"></script>
 <script src="/socket.io/socket.io.js"></script>
 <script>
 const socket = io({ query: { type: 'browser' } });
@@ -70,55 +96,93 @@ const grid = document.getElementById('agentGrid');
 const logBody = document.getElementById('logBody');
 const commitText = document.getElementById('commitText');
 const updateBadge = document.getElementById('updateBadge');
+let termApp = null, termFit = null, termId = null, termAgentId = null;
+let agentsCache = [];
 
 function uptimeFmt(s) {
+  if (!s) return '—';
   const d = Math.floor(s/86400), h = Math.floor(s%86400/3600), m = Math.floor(s%3600/60);
   return (d?d+'g ':'')+(h?h+'s ':'')+m+'dk';
 }
-function fillColor(v, y, r) {
-  return v >= (r||90) ? 'var(--red)' : v >= (y||75) ? 'var(--yellow)' : 'var(--accent)';
-}
+function fmtKB(kb) { return kb > 1024 ? (kb/1024).toFixed(1)+' MB/s' : kb.toFixed(1)+' KB/s'; }
+function fillColor(v, y, r) { return v >= (r||90) ? 'var(--red)' : v >= (y||75) ? 'var(--yellow)' : 'var(--accent)'; }
+
 function renderAgents(list) {
+  agentsCache = list || [];
   if (!list || !list.length) { grid.innerHTML = '<div class="empty">Cihaz bekleniyor...</div>'; return; }
   grid.innerHTML = list.map(a => {
     const s = a.stats || {};
-    return `<div class="card ${a.status}">
+    const net = s.netOnline ? `<span class="net-badge net-online">● online</span>` : `<span class="net-badge net-offline">● offline</span>`;
+    return `<div class="card">
+      ${net}
       <h3>${a.hostname}</h3>
-      <div class="sub">${a.platform} · ${a.ip || '?'}</div>
-      <div class="bars">
-        ${['cpu','ram','disk'].map(k => {
-          const v = Math.round(s[k]||0);
-          return `<div class="bar"><span class="label">${k.toUpperCase()}</span><span class="track"><span class="fill" style="width:${v}%;background:${fillColor(v,75,90)}"></span></span><span class="val">${v}%</span></div>`;
-        }).join('')}
+      <div class="sub">${a.osDistro || a.platform} · ${a.ip}</div>
+      <div class="sysinfo">
+        ${a.cpuModel ? `CPU: <span>${a.cpuModel}</span> (${a.cpuCores} çekirdek)<br>` : ''}
+        ${a.ramTotal ? `RAM: <span>${a.ramTotal} GB</span> · ` : ''}${a.manufacturer ? `Donanım: <span>${a.manufacturer}</span>` : ''}
       </div>
-      <div class="uptime">açık: ${s.uptime?uptimeFmt(s.uptime):'—'}</div>
+      <div class="bars">
+        <div class="bar"><span class="label">CPU</span><span class="track"><span class="fill" style="width:${s.cpu||0}%;background:${fillColor(s.cpu||0,75,90)}"></span></span><span class="val">${s.cpu||0}%</span></div>
+        <div class="bar"><span class="label">RAM</span><span class="track"><span class="fill" style="width:${s.ram||0}%;background:${fillColor(s.ram||0,75,90)}"></span></span><span class="val">${s.ram||0}%${s.ramUsed?' ('+s.ramUsed+' GB)':''}</span></div>
+        <div class="bar"><span class="label">DISK</span><span class="track"><span class="fill" style="width:${s.disk||0}%;background:${fillColor(s.disk||0,75,90)}"></span></span><span class="val">${s.disk||0}%${s.diskUsed?' ('+s.diskUsed+' GB)':''}</span></div>
+        <div class="bar"><span class="label">↓</span><span class="track"><span class="fill" style="width:${Math.min(s.netRx||0,100)}%;background:var(--green)"></span></span><span class="val">${fmtKB(s.netRx||0)}</span></div>
+        <div class="bar"><span class="label">↑</span><span class="track"><span class="fill" style="width:${Math.min(s.netTx||0,100)}%;background:var(--yellow)"></span></span><span class="val">${fmtKB(s.netTx||0)}</span></div>
+      </div>
+      <div class="footer">
+        <span>açık: ${uptimeFmt(s.uptime)}</span>
+        <button class="term-btn" onclick="openTerm('${a.id}','${a.hostname}')">⟶ Terminal</button>
+      </div>
     </div>`;
   }).join('');
 }
+
 function logEntry(from, msg, isErr) {
   const div = document.createElement('div');
   div.className = 'entry' + (isErr ? ' error' : '');
-  const time = new Date().toLocaleTimeString('tr');
-  div.innerHTML = `<span class="from">[${time}] ${from}</span> ${msg}`;
+  div.innerHTML = `<span class="from">[${new Date().toLocaleTimeString('tr')}] ${from}</span> ${msg}`;
   logBody.prepend(div);
-  while (logBody.children.length > 60) logBody.removeChild(logBody.lastChild);
+  while (logBody.children.length > 80) logBody.removeChild(logBody.lastChild);
 }
 
-socket.on('agent-list', renderAgents);
-socket.on('stats-update', ({id, stats}) => {
-  const card = grid.querySelector(`.card`); // simple: full re-render is cheap enough
-  socket.emit('noop'); // keepalive not needed; list refresh below
-});
-// Re-request list periodically for live stats
-setInterval(() => fetch('/api/agents').then(r=>r.json()).then(renderAgents).catch(()=>{}), 3000);
+// Terminal
+function openTerm(agentId, hostname) {
+  if (termApp) closeTerm();
+  termAgentId = agentId;
+  termId = 't' + Date.now();
+  document.getElementById('termTitle').textContent = `Terminal: ${hostname}`;
+  document.getElementById('termModal').classList.add('active');
 
+  termApp = new Terminal({ fontSize: 13, theme: { background: '#0a0e14', foreground: '#c5d0e0', cursor: '#4cc9f0' } });
+  termFit = new FitAddon.FitAddon();
+  termApp.loadAddon(termFit);
+  termApp.open(document.getElementById('termContainer'));
+  termFit.fit();
+
+  termApp.onData(d => socket.emit('term-input', { termId, data: d }));
+  socket.emit('init-term', { agentId, termId, cols: termApp.cols, rows: termApp.rows });
+}
+
+function closeTerm() {
+  if (termId) socket.emit('term-close', { termId });
+  if (termApp) { termApp.dispose(); termApp = null; }
+  termId = null; termAgentId = null;
+  document.getElementById('termModal').classList.remove('active');
+}
+
+socket.on('term-output', ({ termId: tid, data }) => { if (termApp && tid === termId) termApp.write(data); });
+socket.on('term-exit', () => closeTerm());
+socket.on('agent-list', renderAgents);
 socket.on('repo-info', (i) => {
   commitText.textContent = i.commit ? `${i.branch||''}@${i.commit}` : 'git yok';
   updateBadge.style.display = i.update ? '' : 'none';
 });
-socket.on('update-status', ({from, stage, msg}) => {
-  logEntry(from, `${stage}: ${msg}`, stage === 'error');
-});
+socket.on('update-status', ({from, stage, msg}) => logEntry(from, `${stage}: ${msg}`, stage === 'error'));
+
+// Live stats refresh
+setInterval(() => fetch('/api/agents').then(r=>r.json()).then(renderAgents).catch(()=>{}), 2000);
+
+document.getElementById('termClose').onclick = closeTerm;
+window.openTerm = openTerm;
 </script>
 </body>
 </html>

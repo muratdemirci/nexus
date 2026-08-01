@@ -13,18 +13,18 @@ function startHub(port = 5000, opts = {}) {
   const server = http.createServer(app);
   const io = new Server(server);
   const agents = new Map();
+  // termId -> { browserSocketId, agentSocketId }
+  const terms = new Map();
   let info = { branch: null, commit: null, remote: null, update: false };
   let busy = false;
 
   app.use(express.json());
   app.use(express.static(path.join(__dirname, 'public')));
 
-  // GitHub webhook (optional). Push on watched branch -> broadcast update.
   app.post('/webhook', (req, res) => {
     if (req.body && req.body.ref === `refs/heads/${branch}`) broadcastUpdate();
     res.json({ ok: true });
   });
-
   app.get('/api/agents', (req, res) => res.json([...agents.values()]));
 
   async function refresh(silent = false) {
@@ -42,10 +42,8 @@ function startHub(port = 5000, opts = {}) {
     if (busy) return;
     busy = true;
     const has = await refresh(true);
-    io.emit('update-status', { from: 'Hub', stage: 'start', msg: has ? `Güncelleme başladı (${info.commit} -> ${info.remote})` : 'Cihazlar doğrulanıyor (zaten güncel).' });
-    // 1. tell every agent to pull + build + restart
+    io.emit('update-status', { from: 'Hub', stage: 'start', msg: has ? `Güncelleme (${info.commit} -> ${info.remote})` : 'Doğrulanıyor.' });
     io.emit('update-command', { branch, repoDir });
-    // 2. update the hub itself
     if (has) {
       try {
         io.emit('update-status', { from: 'Hub', stage: 'pull', msg: 'Hub pull...' });
@@ -58,29 +56,105 @@ function startHub(port = 5000, opts = {}) {
         io.emit('update-status', { from: 'Hub', stage: 'error', msg: e.message });
         busy = false;
       }
-    } else {
-      busy = false;
-    }
+    } else { busy = false; }
   }
 
   io.on('connection', (socket) => {
     const t = socket.handshake.query.type;
     if (t === 'agent') {
       const q = socket.handshake.query;
-      const a = { id: socket.id, hostname: q.hostname, platform: q.platform, ip: q.ip, stats: {}, status: 'online', lastSeen: Date.now() };
+      const a = {
+        id: socket.id,
+        hostname: q.hostname || '?',
+        platform: q.platform || '?',
+        ip: q.ip || '?',
+        manufacturer: q.manufacturer || '',
+        cpuModel: q.cpuModel || '',
+        cpuCores: q.cpuCores || '',
+        osDistro: q.osDistro || '',
+        osArch: q.osArch || '',
+        ramTotal: q.ramTotal || '',
+        stats: {},
+        status: 'online',
+        lastSeen: Date.now()
+      };
       agents.set(socket.id, a);
-      console.log(`[Hub] Agent bağlandı: ${a.hostname} (${a.ip})`);
+      console.log(`[Hub] Agent: ${a.hostname} (${a.ip})`);
       io.emit('agent-list', [...agents.values()]);
-      socket.on('stats', (s) => { a.stats = s; a.lastSeen = Date.now(); io.emit('stats-update', { id: socket.id, stats: s }); });
+
+      socket.on('stats', (s) => {
+        a.stats = s; a.lastSeen = Date.now();
+        io.emit('stats-update', { id: socket.id, stats: s });
+      });
+
+      // Terminal relay: agent -> browser
+      socket.on('term-output', ({ termId, data }) => {
+        const ts = terms.get(termId);
+        if (ts) io.to(ts.browserSocketId).emit('term-output', { termId, data });
+      });
+      socket.on('term-exit', ({ termId }) => {
+        const ts = terms.get(termId);
+        if (ts) { io.to(ts.browserSocketId).emit('term-exit', { termId }); terms.delete(termId); }
+      });
+
       socket.on('update-status', (st) => io.emit('update-status', { from: a.hostname, ...st }));
-      socket.on('disconnect', () => { agents.delete(socket.id); io.emit('agent-list', [...agents.values()]); });
+      socket.on('disconnect', () => {
+        agents.delete(socket.id);
+        io.emit('agent-list', [...agents.values()]);
+      });
+
     } else {
       socket.emit('agent-list', [...agents.values()]);
       socket.emit('repo-info', info);
+
+      // Browser -> agent: open terminal on a device
+      socket.on('init-term', ({ agentId, termId, cols, rows }) => {
+        const agentSock = io.sockets.sockets.get(agentId);
+        if (agentSock) {
+          terms.set(termId, { browserSocketId: socket.id, agentSocketId: agentId });
+          agentSock.emit('term-init', { termId, cols, rows });
+        } else {
+          socket.emit('term-output', { termId, data: '\r\n\x1b[31mAgent çevrimdışı.\x1b[0m\r\n' });
+        }
+      });
+
+      socket.on('term-input', ({ termId, data }) => {
+        const ts = terms.get(termId);
+        if (ts && ts.browserSocketId === socket.id) {
+          const ag = io.sockets.sockets.get(ts.agentSocketId);
+          if (ag) ag.emit('term-input', { termId, data });
+        }
+      });
+
+      socket.on('term-resize', ({ termId, cols, rows }) => {
+        const ts = terms.get(termId);
+        if (ts && ts.browserSocketId === socket.id) {
+          const ag = io.sockets.sockets.get(ts.agentSocketId);
+          if (ag) ag.emit('term-resize', { termId, cols, rows });
+        }
+      });
+
+      socket.on('term-close', ({ termId }) => {
+        const ts = terms.get(termId);
+        if (ts && ts.browserSocketId === socket.id) {
+          const ag = io.sockets.sockets.get(ts.agentSocketId);
+          if (ag) ag.emit('term-close', { termId });
+          terms.delete(termId);
+        }
+      });
+
+      socket.on('disconnect', () => {
+        for (const [termId, ts] of terms.entries()) {
+          if (ts.browserSocketId === socket.id) {
+            const ag = io.sockets.sockets.get(ts.agentSocketId);
+            if (ag) ag.emit('term-close', { termId });
+            terms.delete(termId);
+          }
+        }
+      });
     }
   });
 
-  // Background poll: if a new commit landed on the remote, fan out the update.
   setInterval(() => { if (!busy) refresh(true).then((u) => { if (u) broadcastUpdate(); }).catch(() => {}); }, pollSec * 1000);
   refresh();
 
