@@ -125,8 +125,8 @@ function renderAgents(list) {
         <div class="bar"><span class="label">CPU</span><span class="track"><span class="fill" style="width:${s.cpu||0}%;background:${fillColor(s.cpu||0,75,90)}"></span></span><span class="val">${s.cpu||0}%</span></div>
         <div class="bar"><span class="label">RAM</span><span class="track"><span class="fill" style="width:${s.ram||0}%;background:${fillColor(s.ram||0,75,90)}"></span></span><span class="val">${s.ram||0}%${s.ramUsed?' ('+s.ramUsed+' GB)':''}</span></div>
         <div class="bar"><span class="label">DISK</span><span class="track"><span class="fill" style="width:${s.disk||0}%;background:${fillColor(s.disk||0,75,90)}"></span></span><span class="val">${s.disk||0}%${s.diskUsed?' ('+s.diskUsed+' GB)':''}</span></div>
-        <div class="bar"><span class="label">↓</span><span class="track"><span class="fill" style="width:${Math.min(s.netRx||0,100)}%;background:var(--green)"></span></span><span class="val">${fmtKB(s.netRx||0)}</span></div>
-        <div class="bar"><span class="label">↑</span><span class="track"><span class="fill" style="width:${Math.min(s.netTx||0,100)}%;background:var(--yellow)"></span></span><span class="val">${fmtKB(s.netTx||0)}</span></div>
+        <div class="bar"><span class="label">DL</span><span class="track"><span class="fill" style="width:${Math.min(s.netRx||0,100)}%;background:var(--green)"></span></span><span class="val">${fmtKB(s.netRx||0)}</span></div>
+        <div class="bar"><span class="label">UL</span><span class="track"><span class="fill" style="width:${Math.min(s.netTx||0,100)}%;background:var(--yellow)"></span></span><span class="val">${fmtKB(s.netTx||0)}</span></div>
       </div>
       <div class="footer">
         <span>açık: ${uptimeFmt(s.uptime)}</span>
