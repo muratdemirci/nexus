@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node index.js",
     "hub": "node index.js --mode hub",
-    "agent": "node index.js --mode agent --hub http://localhost:8888",
+    "agent": "node index.js --mode agent --hub http://localhost:8888"
   },
   "dependencies": {
     "@xterm/addon-fit": "^0.11.0",
