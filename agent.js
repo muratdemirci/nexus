@@ -4,6 +4,7 @@ const si = require('systeminformation');
 const dns = require('dns').promises;
 const pty = require('node-pty');
 const { git, restart } = require('./utils');
+const { startScanner } = require('./discovery');
 
 function gb(bytes) { return +(bytes / 1073741824).toFixed(1); }
 
@@ -11,6 +12,9 @@ function startAgent(hubUrl = 'http://localhost:8888', name = '', intervalMs = 10
   const hostname = name || os.hostname();
   const repoDir = opts.repoDir || __dirname;
   const isWin = os.platform() === 'win32';
+  const discover = opts.discover !== false;
+  // hubKey (hostname:port) -> { url, socket }
+  const sockets = new Map();
 
   // Collect ALL static info first, THEN connect (avoid race with handshake)
   const ip = (() => {
@@ -19,6 +23,28 @@ function startAgent(hubUrl = 'http://localhost:8888', name = '', intervalMs = 10
     }
     return '';
   })();
+
+  function hubKeyOf(url) {
+    const u = new URL(url);
+    const host = u.hostname === 'localhost' || u.hostname === '127.0.0.1' ? os.hostname() : u.hostname;
+    return `${host.toLowerCase()}:${u.port || 8888}`;
+  }
+
+  function connectTo(url, staticInfo) {
+    const key = hubKeyOf(url);
+    if (sockets.has(key)) return;
+    console.log(`[Agent] hub hedefi: ${url}`);
+    const socket = startSocket(url, staticInfo);
+    sockets.set(key, { url, socket });
+  }
+
+  function dropHub(key) {
+    const entry = sockets.get(key);
+    if (!entry) return;
+    console.log(`[Agent] hub kayboldu, bağlantı kapatıldı: ${entry.url}`);
+    try { entry.socket.close(); } catch {}
+    sockets.delete(key);
+  }
 
   Promise.all([
     si.system().catch(() => ({})),
@@ -34,35 +60,59 @@ function startAgent(hubUrl = 'http://localhost:8888', name = '', intervalMs = 10
       osArch: osInfo.arch || '',
       ramTotal: gb(mem.total),
     };
-    startSocket(staticInfo);
-  }).catch(() => startSocket({}));
+    // Always connect to the explicit hub (default: this machine).
+    connectTo(hubUrl, staticInfo);
 
-  function startSocket(staticInfo) {
-  const socket = io(hubUrl, {
-    query: { type: 'agent', hostname, platform: os.platform(), ip, ...staticInfo }
+    // Auto-discover EVERY hub on the LAN and connect to each (full mesh),
+    // so any machine's UI can see and operate all other machines.
+    if (discover) {
+      const seen = new Map();
+      startScanner((peer) => {
+        if (peer.role !== 'hub') return;
+        seen.set(peer.id, peer);
+        const url = `http://${peer.ip}:${peer.port}`;
+        if (!sockets.has(hubKeyOf(url))) connectTo(url, staticInfo);
+      });
+      setInterval(() => {
+        const now = Date.now();
+        for (const [id, peer] of seen) {
+          if (now - peer.lastSeen > 12000) {
+            seen.delete(id);
+            dropHub(hubKeyOf(`http://${peer.ip}:${peer.port}`));
+          }
+        }
+      }, 2000);
+    }
+  }).catch(() => {
+    connectTo(hubUrl, {});
   });
-  let timer = null;
-  let netTimer = null;
-  let prevNet = null;
-  let netOnline = false;
 
-  // Terminal sessions: termId -> child process
-  const shells = new Map();
+  function startSocket(url, staticInfo) {
+    const socket = io(url, {
+      query: { type: 'agent', hostname, platform: os.platform(), ip, ...staticInfo }
+    });
+    let timer = null;
+    let netTimer = null;
+    let prevNet = null;
+    let netOnline = false;
 
-  socket.on('connect', () => {
-    console.log(`[Agent] Hub: ${socket.id}`);
-    timer = setInterval(() => report(socket), intervalMs);
-    netTimer = setInterval(() => checkInternet(socket), 10000);
-    checkInternet(socket); // immediate first check
-  });
+    // Terminal sessions: termId -> child process
+    const shells = new Map();
 
-  socket.on('disconnect', () => {
-    if (timer) clearInterval(timer);
-    if (netTimer) clearInterval(netTimer);
-    for (const [, child] of shells) { try { child.kill(); } catch {} }
-    shells.clear();
-    console.log('[Agent] bağlantı koptu, tekrar deneniyor...');
-  });
+    socket.on('connect', () => {
+      console.log(`[Agent] Hub: ${socket.id} @ ${url}`);
+      timer = setInterval(() => report(socket), intervalMs);
+      netTimer = setInterval(() => checkInternet(socket), 10000);
+      checkInternet(socket); // immediate first check
+    });
+
+    socket.on('disconnect', () => {
+      if (timer) clearInterval(timer);
+      if (netTimer) clearInterval(netTimer);
+      for (const [, child] of shells) { try { child.kill(); } catch {} }
+      shells.clear();
+      console.log('[Agent] bağlantı koptu, tekrar deneniyor...');
+    });
 
     // Periodic stats including network throughput
     async function report(socket) {
@@ -70,9 +120,6 @@ function startAgent(hubUrl = 'http://localhost:8888', name = '', intervalMs = 10
         const [cpuLoad, mem, fs, net] = await Promise.all([si.currentLoad(), si.mem(), si.fsSize(), si.networkStats()]);
         const disk = (fs.find((d) => ['/', 'C:', '/System/Volumes/Data'].includes(d.mount)) || fs[0] || {});
 
-        // Network speed: compare with previous measurement.
-        // Some environments (notably some Windows adapters) report zeroed counters,
-        // so we keep a small fallback animation to ensure the UI still updates.
         let netRx = 0, netTx = 0;
         const activeIface = net.find(i => !i.internal && i.iface !== 'lo') || net[0];
         const hasCounters = !!(activeIface && (activeIface.rx_bytes > 0 || activeIface.tx_bytes > 0));
@@ -170,6 +217,8 @@ function startAgent(hubUrl = 'http://localhost:8888', name = '', intervalMs = 10
         socket.emit('update-status', { stage: 'error', msg: e.message });
       }
     });
+
+    return socket;
   } // end startSocket
 }
 

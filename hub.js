@@ -3,11 +3,14 @@ const http = require('http');
 const { Server } = require('socket.io');
 const path = require('path');
 const { git, restart } = require('./utils');
+const { startBeacon, trackPeers } = require('./discovery');
 
 function startHub(port = 8888, opts = {}) {
   const repoDir = opts.repoDir || __dirname;
   const branch = opts.updateBranch || 'main';
   const pollSec = opts.updateInterval || 60;
+  const name = opts.name || require('os').hostname();
+  const discover = opts.discover !== false;
 
   const app = express();
   const server = http.createServer(app);
@@ -28,6 +31,18 @@ function startHub(port = 8888, opts = {}) {
     res.json({ ok: true });
   });
   app.get('/api/agents', (req, res) => res.json([...agents.values()]));
+  app.get('/api/network', (req, res) => res.json(network.all));
+
+  // LAN discovery: announce this hub + track peers (hubs & agents) on the subnet.
+  let network = { all: () => [] };
+  let beacon = null;
+  if (discover) {
+    const peers = trackPeers(({ type, peer }) => {
+      console.log(`[Net] ${type} ${peer.role}: ${peer.hostname} (${peer.src})`);
+    });
+    network = peers;
+    beacon = startBeacon({ role: 'hub', name, port });
+  }
 
   async function refresh(silent = false) {
     info.branch = (await git.branch(repoDir)) || info.branch;

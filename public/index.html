@@ -37,6 +37,17 @@
   .term-btn { background:var(--accent); color:var(--bg); border:none; padding:5px 12px; border-radius:5px; font-weight:600; cursor:pointer; font-size:12px; }
   .term-btn:hover { opacity:.85; }
   .side { display:flex; flex-direction:column; gap:16px; }
+  .net { background:var(--panel); border:1px solid var(--border); border-radius:10px; padding:16px; }
+  .net h3 { font-size:13px; letter-spacing:1px; color:var(--dim); margin-bottom:10px; }
+  .net-item { display:flex; justify-content:space-between; align-items:center; gap:8px; padding:6px 8px; border-radius:6px; font-size:12px; }
+  .net-item:nth-child(odd) { background:rgba(255,255,255,.02); }
+  .net-item .tag { font-size:10px; padding:1px 7px; border-radius:8px; text-transform:uppercase; letter-spacing:.5px; font-weight:600; }
+  .net-item .tag.hub { background:rgba(76,201,240,.15); color:var(--accent); }
+  .net-item .tag.agent { background:rgba(74,222,128,.15); color:var(--green); }
+  .net-item .who { flex:1; min-width:0; }
+  .net-item .who b { color:var(--text); }
+  .net-item .who .ip { color:var(--dim); font-family:monospace; font-size:11px; }
+  .net-empty { color:var(--dim); font-size:12px; padding:6px 8px; }
   .log { background:var(--panel); border:1px solid var(--border); border-radius:10px; padding:16px; }
   .log h3 { font-size:13px; letter-spacing:1px; color:var(--dim); margin-bottom:10px; }
   .log-body { font-family:monospace; font-size:12px; max-height:500px; overflow-y:auto; display:flex; flex-direction:column-reverse; gap:3px; }
@@ -69,6 +80,10 @@
     <div class="empty">Cihaz bekleniyor...</div>
   </div>
   <div class="side">
+    <div class="net">
+      <h3>AĞDAKİ CİHAZLAR</h3>
+      <div id="netBody"><div class="net-empty">Keşif devam ediyor...</div></div>
+    </div>
     <div class="log">
       <h3>GÜNLÜK</h3>
       <div class="log-body" id="logBody"></div>
@@ -191,6 +206,19 @@ socket.on('update-status', ({from, stage, msg}) => logEntry(from, `${stage}: ${m
 
 // Live stats refresh
 setInterval(() => fetch('/api/agents').then(r=>r.json()).then(renderAgents).catch(()=>{}), 1000);
+
+// LAN discovery: show hubs/agents found on the subnet
+const netBody = document.getElementById('netBody');
+function renderNetwork(list) {
+  if (!list || !list.length) { netBody.innerHTML = '<div class="net-empty">Ağda cihaz bulunamadı.</div>'; return; }
+  netBody.innerHTML = list.map(p => `
+    <div class="net-item">
+      <span class="tag ${p.role}">${p.role}</span>
+      <span class="who"><b>${p.hostname}</b> <span class="ip">${p.name||''} · ${p.src||p.ip}</span></span>
+      <span style="color:var(--dim);font-size:11px">${new Date(p.lastSeen).toLocaleTimeString('tr')}</span>
+    </div>`).join('');
+}
+setInterval(() => fetch('/api/network').then(r=>r.json()).then(renderNetwork).catch(()=>{}), 2000);
 
 document.getElementById('termClose').onclick = closeTerm;
 window.openTerm = openTerm;

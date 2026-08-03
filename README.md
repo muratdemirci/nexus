@@ -19,6 +19,25 @@ npm install
 
 ## Çalıştırma
 
+### 0) Aynı yerel ağdaki birden çok bilgisayarı birbirine bağlama (LAN keşfi)
+
+Nexus, aynı subnet üzerindeki bilgisayarları UDP broadcast ile otomatik keşfeder
+(`discovery.js`, UDP port `8889`). Her makine hub beacon yayınlar, her agent
+LAN'daki **tüm** hub'ları bulup **hepsine** bağlanır. Böylece her makinenin
+arayüzü ağdaki diğer tüm cihazları görür ve aralarında terminal açılabilir.
+
+Diğer makinelere yeni IP adresi girmeye gerek yoktur; sadece `npm start`
+çalıştırın. Web arayüzündeki **"AĞDAKİ CİHAZLAR"** paneli keşfedilen cihazları listeler.
+
+Tek makinede test için değişiklik yoktur — sadece kendinizi görürsünüz.
+
+> **Güvenlik duvarı (Windows):** Keşif (`UDP 8889`) ve web arayüzü (`TCP 8888`)
+> için gelen bağlantılara izin verin. Windows Güvenlik Duvarı'na `node` için
+> özel kural ekleyin, ya da apache/modemde **AP/İstemci İzolasyonu** (AP isolation)
+> kapalı olduğundan emin olun.
+
+Keşfi kapatmak isterseniz `--no-discover` kullanın.
+
 ### 1) Hub çalıştırma
 
 ```bash
@@ -65,6 +84,7 @@ Kullanılabilir seçenekler:
 - `--hub` / `-H`: agent'ın bağlanacağı hub adresi
 - `--name` / `-n`: agent adı
 - `--interval` / `-i`: durum raporu aralığı (ms)
+- `--no-discover`: LAN keşfini kapatır
 
 ## Notlar
 
@@ -78,5 +98,5 @@ Eğer bağlantı kurulamazsa:
 
 1. Hub'un çalıştığından emin olun
 2. Agent'ın `--hub` adresini kontrol edin
-3. Port 8888'in açık olduğundan emin olun
+3. Port 8888 (TCP) ve 8889 (UDP) açık olduğundan emin olun
 4. Gerekirse `npm install` komutunu yeniden çalıştırın
