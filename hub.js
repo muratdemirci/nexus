@@ -4,7 +4,7 @@ const { Server } = require('socket.io');
 const path = require('path');
 const { git, restart } = require('./utils');
 
-function startHub(port = 5000, opts = {}) {
+function startHub(port = 8888, opts = {}) {
   const repoDir = opts.repoDir || __dirname;
   const branch = opts.updateBranch || 'main';
   const pollSec = opts.updateInterval || 60;

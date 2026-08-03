@@ -28,7 +28,7 @@ npm run hub
 Bu mod, web arayüzünü ve hub servisini başlatır. Tarayıcıdan şu adrese gidin:
 
 ```text
-http://localhost:5000
+http://localhost:8888
 ```
 
 ### 2) Agent çalıştırma
@@ -39,7 +39,7 @@ Aynı bilgisayarda yerel olarak test etmek için:
 npm run agent
 ```
 
-Bu komut, varsayılan olarak `http://localhost:5000` adresindeki hub'a bağlanır.
+Bu komut, varsayılan olarak `http://localhost:8888` adresindeki hub'a bağlanır.
 
 ### 3) Aynı anda hub + agent çalıştırma
 
@@ -54,8 +54,8 @@ Bu komut hem hub hem de agent'ı aynı anda başlatır.
 Hub ve agent için parametreler verilebilir:
 
 ```bash
-node index.js --mode hub --port 5000
-node index.js --mode agent --hub http://192.168.1.10:5000 --name RaspberryPi
+node index.js --mode hub --port 8888
+node index.js --mode agent --hub http://192.168.1.10:8888 --name RaspberryPi
 ```
 
 Kullanılabilir seçenekler:
@@ -68,7 +68,7 @@ Kullanılabilir seçenekler:
 
 ## Notlar
 
-- Varsayılan hub portu: `5000`
+- Varsayılan hub portu: `8888`
 - Web arayüzü `public/` klasöründen sunulur
 - Agent, sistem bilgilerini hub'a gönderir ve terminal açma/komut çalıştırma gibi işlevleri destekler
 
@@ -78,5 +78,5 @@ Eğer bağlantı kurulamazsa:
 
 1. Hub'un çalıştığından emin olun
 2. Agent'ın `--hub` adresini kontrol edin
-3. Port 5000'in açık olduğundan emin olun
+3. Port 8888'in açık olduğundan emin olun
 4. Gerekirse `npm install` komutunu yeniden çalıştırın

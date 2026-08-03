@@ -6,7 +6,7 @@ const path = require('path');
 
 function parseArgs() {
   const a = process.argv.slice(2);
-  const p = { mode: 'both', port: 5000, hub: 'http://localhost:5000', name: os.hostname(), interval: 1000, repoDir: path.resolve(__dirname), updateBranch: 'main', updateInterval: 60 };
+  const p = { mode: 'both', port: 8888, hub: 'http://localhost:8888', name: os.hostname(), interval: 1000, repoDir: path.resolve(__dirname), updateBranch: 'main', updateInterval: 60 };
   for (let i = 0; i < a.length; i++) {
     switch (a[i]) {
       case '--mode': case '-m': p.mode = a[++i]; break;

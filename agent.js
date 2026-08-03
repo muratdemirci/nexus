@@ -7,7 +7,7 @@ const { git, restart } = require('./utils');
 
 function gb(bytes) { return +(bytes / 1073741824).toFixed(1); }
 
-function startAgent(hubUrl = 'http://localhost:5000', name = '', intervalMs = 1000, opts = {}) {
+function startAgent(hubUrl = 'http://localhost:8888', name = '', intervalMs = 1000, opts = {}) {
   const hostname = name || os.hostname();
   const repoDir = opts.repoDir || __dirname;
   const isWin = os.platform() === 'win32';
