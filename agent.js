@@ -227,15 +227,9 @@ function startAgent(
       if (platform === "win32") {
         const home = process.env.USERPROFILE || process.env.HOME || "C:\\";
         const downloads = path.join(home, "Downloads");
-        const cmderCandidates = [
-          path.join(downloads, "cmder.exe"),
-          path.join(downloads, "Cmder.exe"),
-          path.join(downloads, "cmder", "Cmder.exe"),
-          path.join(downloads, "cmder", "cmder.exe"),
-          path.join(downloads, "Cmder", "cmder.exe"),
+        const gitForWindowsShells = [
           path.join(
-            home,
-            "Downloads",
+            downloads,
             "Cmder",
             "vendor",
             "git-for-windows",
@@ -243,22 +237,47 @@ function startAgent(
             "bin",
             "bash.exe",
           ),
+          path.join(
+            downloads,
+            "cmder",
+            "vendor",
+            "git-for-windows",
+            "usr",
+            "bin",
+            "bash.exe",
+          ),
+          path.join(
+            downloads,
+            "Cmder",
+            "vendor",
+            "git-for-windows",
+            "bin",
+            "bash.exe",
+          ),
+          path.join(
+            downloads,
+            "cmder",
+            "vendor",
+            "git-for-windows",
+            "bin",
+            "bash.exe",
+          ),
+          path.join(downloads, "Cmder", "vendor", "bin", "bash.exe"),
+          path.join(downloads, "cmder", "vendor", "bin", "bash.exe"),
         ];
 
-        const candidates = [
-          ...cmderCandidates,
+        const shell = [
+          ...gitForWindowsShells,
           process.env.ComSpec,
           "C:\\Windows\\System32\\cmd.exe",
           "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
           "C:\\Program Files\\PowerShell\\7\\pwsh.exe",
           "powershell.exe",
-        ];
-
-        const shell = candidates.find((candidate) => {
+        ].find((candidate) => {
           if (!candidate || !candidate.trim()) return false;
           const lower = candidate.toLowerCase();
-          if (lower.includes("cmder")) return fs.existsSync(candidate);
           return (
+            lower.includes("bash.exe") ||
             lower.includes("cmd.exe") ||
             lower.includes("powershell") ||
             lower.includes("pwsh") ||
@@ -268,8 +287,8 @@ function startAgent(
 
         const resolved = shell || "C:\\Windows\\System32\\cmd.exe";
         const lower = resolved.toLowerCase();
-        const args = lower.includes("cmder")
-          ? ["-reuse"]
+        const args = lower.includes("bash.exe")
+          ? ["--login", "-i"]
           : lower.includes("powershell") || lower.includes("pwsh")
             ? ["-NoLogo"]
             : ["/K"];
