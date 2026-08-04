@@ -219,34 +219,24 @@ function startAgent(
     }
 
     // ===== Terminal (real PTY via node-pty) =====
+    function getTerminalShell() {
+      if (isWin) {
+        const shell = process.env.ComSpec || "C:\\Windows\\System32\\cmd.exe";
+        const lower = shell.toLowerCase();
+        const args = lower.includes("powershell") || lower.includes("pwsh") ? ["-NoLogo"] : ["/K"];
+        return { shell, args };
+      }
+
+      const shell = process.env.SHELL || "/bin/bash";
+      return { shell, args: [] };
+    }
+
     socket.on("term-init", ({ termId, cols, rows }) => {
-      const fs = require("fs");
-      const winShells = [
-        process.env.ComSpec,
-        "C:\\Windows\\System32\\cmd.exe",
-        "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
-        "C:\\Program Files\\PowerShell\\7\\pwsh.exe",
-        "powershell.exe",
-      ].filter(Boolean);
-      const posixShells = [process.env.SHELL, "/bin/bash", "/bin/zsh", "/bin/sh"]
-        .filter(Boolean);
-
-      const shell = (isWin ? winShells : posixShells).find((candidate) => {
-        if (!candidate || !candidate.trim()) return false;
-        if (isWin) {
-          return fs.existsSync(candidate) || candidate.toLowerCase().includes("powershell") || candidate.toLowerCase().includes("cmd.exe") || candidate.toLowerCase().includes("pwsh");
-        }
-        return true;
-      });
-
-      const normalizedShell = shell || (isWin ? "C:\\Windows\\System32\\cmd.exe" : "/bin/bash");
-      const lowerShell = normalizedShell.toLowerCase();
-      const args = isWin
-        ? (lowerShell.includes("powershell") || lowerShell.includes("pwsh") ? ["-NoLogo"] : ["/K"])
-        : [];
+      const { shell, args } = getTerminalShell();
+      console.log(`[Agent] terminal shell: ${shell} ${args.join(" ")}`);
 
       try {
-        const term = pty.spawn(normalizedShell, args, {
+        const term = pty.spawn(shell, args, {
           name: "xterm-256color",
           cols: cols || 80,
           rows: rows || 24,
@@ -254,7 +244,7 @@ function startAgent(
           env: {
             ...process.env,
             TERM: "xterm-256color",
-            SHELL: normalizedShell,
+            SHELL: shell,
           },
         });
         shells.set(termId, term);
