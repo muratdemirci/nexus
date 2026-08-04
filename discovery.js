@@ -29,6 +29,31 @@ function lanIP() {
   return ifaces.length ? ifaces[0].address : '127.0.0.1';
 }
 
+function localPeerIds() {
+  const names = new Set([os.hostname().toLowerCase()]);
+  const ips = new Set(['127.0.0.1', 'localhost']);
+
+  for (const ifaces of Object.values(os.networkInterfaces())) {
+    for (const i of ifaces || []) {
+      if (i.internal) continue;
+      if (i.family === 'IPv4') {
+        ips.add(i.address);
+        if (i.address) names.add(i.address);
+      }
+    }
+  }
+
+  return { names, ips };
+}
+
+function isOwnPeer(peer) {
+  if (!peer) return false;
+  const { names, ips } = localPeerIds();
+  const host = String(peer.hostname || '').toLowerCase();
+  const ip = String(peer.ip || '');
+  return !!((host && names.has(host)) || (ip && ips.has(ip)));
+}
+
 function subnetBroadcasts() {
   const out = [];
   for (const i of lanInterfaces()) {
@@ -114,7 +139,8 @@ function trackPeers(onChange, { roles = ['hub', 'agent'] } = {}) {
   }, 2000);
 
   const handle = (peer) => {
-    if (!roles.includes(peer.role)) return;
+    if (!peer || !roles.includes(peer.role)) return;
+    if (isOwnPeer(peer)) return;
     const prev = peers.get(peer.id);
     peers.set(peer.id, peer);
     onChange({ type: prev ? 'update' : 'add', peer });

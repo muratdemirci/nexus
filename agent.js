@@ -165,15 +165,20 @@ function startAgent(hubUrl = 'http://localhost:8888', name = '', intervalMs = 10
 
     // ===== Terminal (real PTY via node-pty) =====
     socket.on('term-init', ({ termId, cols, rows }) => {
-      const shell = isWin ? 'powershell.exe' : (process.env.SHELL || '/bin/bash');
-      const args = isWin ? ['-NoLogo'] : [];
+      const shellCandidates = isWin
+        ? [process.env.ComSpec, 'C:\\Windows\\System32\\cmd.exe', 'powershell.exe', 'pwsh.exe']
+        : [process.env.SHELL, '/bin/bash', '/bin/zsh', '/bin/sh'];
+
+      const shell = shellCandidates.find((candidate) => !!candidate && candidate.trim() !== '');
+      const args = isWin ? ['/K'] : [];
+
       try {
-        const term = pty.spawn(shell, args, {
+        const term = pty.spawn(shell || (isWin ? 'cmd.exe' : '/bin/bash'), args, {
           name: 'xterm-256color',
           cols: cols || 80,
           rows: rows || 24,
           cwd: os.homedir(),
-          env: { ...process.env, TERM: 'xterm-256color' },
+          env: { ...process.env, TERM: 'xterm-256color', SHELL: shell || (isWin ? 'cmd.exe' : '/bin/bash') },
         });
         shells.set(termId, term);
         term.onData(d => socket.emit('term-output', { termId, data: d }));
