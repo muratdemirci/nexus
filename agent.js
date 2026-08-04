@@ -224,6 +224,15 @@ function startAgent(
       const path = require("path");
       const platform = os.platform();
 
+      const isRunnableShell = (candidate) => {
+        if (!candidate || !candidate.trim()) return false;
+        try {
+          return fs.existsSync(candidate) && fs.statSync(candidate).isFile();
+        } catch {
+          return false;
+        }
+      };
+
       if (platform === "win32") {
         const home = process.env.USERPROFILE || process.env.HOME || "C:\\";
         const downloads = path.join(home, "Downloads");
@@ -281,7 +290,7 @@ function startAgent(
             lower.includes("cmd.exe") ||
             lower.includes("powershell") ||
             lower.includes("pwsh") ||
-            fs.existsSync(candidate)
+            isRunnableShell(candidate)
           );
         });
 
@@ -295,7 +304,7 @@ function startAgent(
         return { shell: resolved, args };
       }
 
-      const candidates = [
+      const macShells = [
         process.env.SHELL,
         "/bin/bash",
         "/bin/zsh",
@@ -303,14 +312,24 @@ function startAgent(
         "/usr/local/bin/bash",
         "/opt/homebrew/bin/bash",
         "/opt/homebrew/bin/zsh",
-      ];
-
-      const shell = candidates.find((candidate) => {
+        "/usr/local/bin/zsh",
+        "/usr/bin/bash",
+        "/usr/bin/zsh",
+        "/usr/bin/env",
+      ].filter((candidate) => {
         if (!candidate || !candidate.trim()) return false;
-        return fs.existsSync(candidate);
+        const lower = candidate.toLowerCase();
+        if (
+          lower.includes("terminal.app") ||
+          lower.includes("iterm") ||
+          lower.includes("app")
+        )
+          return false;
+        return isRunnableShell(candidate);
       });
 
-      return { shell: shell || "/bin/bash", args: [] };
+      const shell = macShells[0] || "/bin/bash";
+      return { shell, args: [] };
     }
 
     socket.on("term-init", ({ termId, cols, rows }) => {
