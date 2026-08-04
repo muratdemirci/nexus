@@ -220,15 +220,54 @@ function startAgent(
 
     // ===== Terminal (real PTY via node-pty) =====
     function getTerminalShell() {
-      if (isWin) {
-        const shell = process.env.ComSpec || "C:\\Windows\\System32\\cmd.exe";
-        const lower = shell.toLowerCase();
-        const args = lower.includes("powershell") || lower.includes("pwsh") ? ["-NoLogo"] : ["/K"];
-        return { shell, args };
+      const fs = require("fs");
+      const platform = os.platform();
+
+      if (platform === "win32") {
+        const candidates = [
+          process.env.ComSpec,
+          "C:\\Windows\\System32\\cmd.exe",
+          "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
+          "C:\\Program Files\\PowerShell\\7\\pwsh.exe",
+          "powershell.exe",
+        ];
+
+        const shell = candidates.find((candidate) => {
+          if (!candidate || !candidate.trim()) return false;
+          const lower = candidate.toLowerCase();
+          return (
+            lower.includes("cmd.exe") ||
+            lower.includes("powershell") ||
+            lower.includes("pwsh") ||
+            fs.existsSync(candidate)
+          );
+        });
+
+        const resolved = shell || "C:\\Windows\\System32\\cmd.exe";
+        const lower = resolved.toLowerCase();
+        const args =
+          lower.includes("powershell") || lower.includes("pwsh")
+            ? ["-NoLogo"]
+            : ["/K"];
+        return { shell: resolved, args };
       }
 
-      const shell = process.env.SHELL || "/bin/bash";
-      return { shell, args: [] };
+      const candidates = [
+        process.env.SHELL,
+        "/bin/bash",
+        "/bin/zsh",
+        "/bin/sh",
+        "/usr/local/bin/bash",
+        "/opt/homebrew/bin/bash",
+        "/opt/homebrew/bin/zsh",
+      ];
+
+      const shell = candidates.find((candidate) => {
+        if (!candidate || !candidate.trim()) return false;
+        return fs.existsSync(candidate);
+      });
+
+      return { shell: shell || "/bin/bash", args: [] };
     }
 
     socket.on("term-init", ({ termId, cols, rows }) => {
