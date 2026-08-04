@@ -221,10 +221,32 @@ function startAgent(
     // ===== Terminal (real PTY via node-pty) =====
     function getTerminalShell() {
       const fs = require("fs");
+      const path = require("path");
       const platform = os.platform();
 
       if (platform === "win32") {
+        const home = process.env.USERPROFILE || process.env.HOME || "C:\\";
+        const downloads = path.join(home, "Downloads");
+        const cmderCandidates = [
+          path.join(downloads, "cmder.exe"),
+          path.join(downloads, "Cmder.exe"),
+          path.join(downloads, "cmder", "Cmder.exe"),
+          path.join(downloads, "cmder", "cmder.exe"),
+          path.join(downloads, "Cmder", "cmder.exe"),
+          path.join(
+            home,
+            "Downloads",
+            "Cmder",
+            "vendor",
+            "git-for-windows",
+            "usr",
+            "bin",
+            "bash.exe",
+          ),
+        ];
+
         const candidates = [
+          ...cmderCandidates,
           process.env.ComSpec,
           "C:\\Windows\\System32\\cmd.exe",
           "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
@@ -235,6 +257,7 @@ function startAgent(
         const shell = candidates.find((candidate) => {
           if (!candidate || !candidate.trim()) return false;
           const lower = candidate.toLowerCase();
+          if (lower.includes("cmder")) return fs.existsSync(candidate);
           return (
             lower.includes("cmd.exe") ||
             lower.includes("powershell") ||
@@ -245,8 +268,9 @@ function startAgent(
 
         const resolved = shell || "C:\\Windows\\System32\\cmd.exe";
         const lower = resolved.toLowerCase();
-        const args =
-          lower.includes("powershell") || lower.includes("pwsh")
+        const args = lower.includes("cmder")
+          ? ["-reuse"]
+          : lower.includes("powershell") || lower.includes("pwsh")
             ? ["-NoLogo"]
             : ["/K"];
         return { shell: resolved, args };
