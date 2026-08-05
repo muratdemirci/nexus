@@ -227,7 +227,11 @@ function startAgent(
       const isRunnableShell = (candidate) => {
         if (!candidate || !candidate.trim()) return false;
         try {
-          return fs.existsSync(candidate) && fs.statSync(candidate).isFile();
+          const ok =
+            fs.existsSync(candidate) && fs.statSync(candidate).isFile();
+          if (!ok) return false;
+          fs.accessSync(candidate, fs.constants.X_OK);
+          return true;
         } catch {
           return false;
         }
@@ -301,7 +305,7 @@ function startAgent(
           : lower.includes("powershell") || lower.includes("pwsh")
             ? ["-NoLogo"]
             : ["/K"];
-        return { shell: resolved, args };
+        return { shell: resolved, args, reason: null };
       }
 
       const macShells = [
@@ -315,7 +319,6 @@ function startAgent(
         "/usr/local/bin/zsh",
         "/usr/bin/bash",
         "/usr/bin/zsh",
-        "/usr/bin/env",
       ].filter((candidate) => {
         if (!candidate || !candidate.trim()) return false;
         const lower = candidate.toLowerCase();
@@ -328,13 +331,32 @@ function startAgent(
         return isRunnableShell(candidate);
       });
 
-      const shell = macShells[0] || "/bin/bash";
-      return { shell, args: [] };
+      const shell = macShells[0] || null;
+      if (!shell) {
+        return {
+          shell: null,
+          args: [],
+          reason:
+            "No valid macOS shell found. Run: echo $SHELL; ls -l /bin/bash /bin/zsh /bin/sh; which bash; which zsh",
+        };
+      }
+
+      return { shell, args: ["-l", "-i"], reason: null };
     }
 
     socket.on("term-init", ({ termId, cols, rows }) => {
-      const { shell, args } = getTerminalShell();
-      console.log(`[Agent] terminal shell: ${shell} ${args.join(" ")}`);
+      const { shell, args, reason } = getTerminalShell();
+      console.log(
+        `[Agent] terminal shell: ${shell || "<none>"} ${args.join(" ")}`,
+      );
+
+      if (!shell) {
+        socket.emit("term-output", {
+          termId,
+          data: `\r\n\x1b[31mShell hatası: ${reason}\x1b[0m\r\n`,
+        });
+        return;
+      }
 
       try {
         const term = pty.spawn(shell, args, {
