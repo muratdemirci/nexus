@@ -304,7 +304,7 @@ function startAgent(
             return ["-NoLogo"];
           return ["/K"];
         }
-        return [];
+        return /(bash|zsh|sh)$/.test(lower) ? ["-l", "-i"] : [];
       };
 
       const candidates = [];
