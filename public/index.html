@@ -3,23 +3,32 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#0a0e14">
 <title>NEXUS</title>
+<link rel="manifest" href="/manifest.json">
+<link rel="icon" href="/icons/icon-192.png" type="image/png">
+<link rel="apple-touch-icon" href="/icons/icon-192.png">
 <link rel="stylesheet" href="/xterm/css/xterm.css">
 <style>
   :root { --bg:#0a0e14; --panel:#0f1623; --border:#1c2738; --text:#c5d0e0; --dim:#5a6a85; --accent:#4cc9f0; --green:#4ade80; --yellow:#facc15; --red:#f87171; }
   * { margin:0; padding:0; box-sizing:border-box; }
   body { background:var(--bg); color:var(--text); font:14px/1.5 'Segoe UI',system-ui,sans-serif; min-height:100vh; }
-  .topbar { display:flex; align-items:center; justify-content:space-between; padding:16px 28px; border-bottom:1px solid var(--border); background:var(--panel); position:sticky; top:0; z-index:10; }
+  .topbar { display:flex; align-items:center; justify-content:space-between; padding:12px 28px; border-bottom:1px solid var(--border); background:var(--panel); position:sticky; top:0; z-index:10; gap:12px; flex-wrap:wrap; }
   .topbar h1 { font-size:20px; letter-spacing:4px; }
   .topbar h1 span { color:var(--accent); }
   .repo-bar { display:flex; align-items:center; gap:14px; font-size:13px; }
   .repo-bar .commit { font-family:monospace; background:var(--bg); padding:4px 8px; border-radius:4px; border:1px solid var(--border); }
   .repo-bar .update { color:var(--green); animation:pulse 1.5s infinite; }
   @keyframes pulse { 50% { opacity:0.5; } }
+  .topbar-actions { display:flex; gap:8px; }
+  .tbtn { background:var(--panel); color:var(--text); border:1px solid var(--border); padding:5px 12px; border-radius:6px; cursor:pointer; font-size:12px; font-weight:600; }
+  .tbtn:hover { border-color:var(--accent); color:var(--accent); }
   .layout { display:grid; grid-template-columns:1fr 340px; gap:20px; padding:20px 28px; }
   @media (max-width:900px) { .layout { grid-template-columns:1fr; } }
-  .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(340px,1fr)); gap:16px; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(360px,1fr)); gap:16px; }
   .card { background:var(--panel); border:1px solid var(--border); border-radius:10px; padding:18px; border-left:3px solid var(--green); position:relative; }
+  .card.warn { border-left-color:var(--yellow); }
+  .card.crit { border-left-color:var(--red); }
   .card .net-badge { position:absolute; top:14px; right:14px; font-size:11px; padding:2px 8px; border-radius:10px; font-weight:600; }
   .card .net-online { background:rgba(74,222,128,.15); color:var(--green); }
   .card .net-offline { background:rgba(248,113,113,.15); color:var(--red); }
@@ -33,12 +42,17 @@
   .bar .track { flex:1; height:7px; background:var(--bg); border-radius:4px; overflow:hidden; }
   .bar .fill { display:block; height:100%; border-radius:4px; transition:width .35s ease, background .35s ease; background:var(--accent); }
   .bar .val { width:72px; text-align:right; font-family:monospace; color:var(--dim); }
-  .card .footer { display:flex; justify-content:space-between; align-items:center; font-size:11px; color:var(--dim); }
-  .term-btn { background:var(--accent); color:var(--bg); border:none; padding:5px 12px; border-radius:5px; font-weight:600; cursor:pointer; font-size:12px; }
+  .card .footer { display:flex; justify-content:space-between; align-items:center; font-size:11px; color:var(--dim); margin-bottom:10px; }
+  .card-actions { display:flex; gap:6px; flex-wrap:wrap; }
+  .term-btn { background:var(--accent); color:var(--bg); border:none; padding:5px 10px; border-radius:5px; font-weight:600; cursor:pointer; font-size:11px; }
   .term-btn:hover { opacity:.85; }
+  .term-btn.ghost { background:var(--panel); color:var(--text); border:1px solid var(--border); }
+  .term-btn.ghost:hover { border-color:var(--accent); }
+  .term-btn.danger { background:rgba(248,113,113,.15); color:var(--red); border:1px solid var(--red); }
+  .term-btn.danger:hover { background:var(--red); color:var(--bg); }
   .side { display:flex; flex-direction:column; gap:16px; }
-  .net { background:var(--panel); border:1px solid var(--border); border-radius:10px; padding:16px; }
-  .net h3 { font-size:13px; letter-spacing:1px; color:var(--dim); margin-bottom:10px; }
+  .net, .log, .history { background:var(--panel); border:1px solid var(--border); border-radius:10px; padding:16px; }
+  .net h3, .log h3, .history h3 { font-size:13px; letter-spacing:1px; color:var(--dim); margin-bottom:10px; }
   .net-item { display:flex; justify-content:space-between; align-items:center; gap:8px; padding:6px 8px; border-radius:6px; font-size:12px; }
   .net-item:nth-child(odd) { background:rgba(255,255,255,.02); }
   .net-item .tag { font-size:10px; padding:1px 7px; border-radius:8px; text-transform:uppercase; letter-spacing:.5px; font-weight:600; }
@@ -48,22 +62,62 @@
   .net-item .who b { color:var(--text); }
   .net-item .who .ip { color:var(--dim); font-family:monospace; font-size:11px; }
   .net-empty { color:var(--dim); font-size:12px; padding:6px 8px; }
-  .log { background:var(--panel); border:1px solid var(--border); border-radius:10px; padding:16px; }
-  .log h3 { font-size:13px; letter-spacing:1px; color:var(--dim); margin-bottom:10px; }
-  .log-body { font-family:monospace; font-size:12px; max-height:500px; overflow-y:auto; display:flex; flex-direction:column-reverse; gap:3px; }
+  .log-body { font-family:monospace; font-size:12px; max-height:340px; overflow-y:auto; display:flex; flex-direction:column-reverse; gap:3px; }
   .log-body .entry { color:var(--dim); word-break:break-word; }
   .log-body .entry .from { color:var(--accent); }
   .log-body .entry.error { color:var(--red); }
+  .log-body .entry.warn { color:var(--yellow); }
   .empty { color:var(--dim); text-align:center; padding:60px 20px; grid-column:1/-1; }
-  /* Terminal modal */
   .modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.7); z-index:100; justify-content:center; align-items:center; }
   .modal-overlay.active { display:flex; }
-  .modal { background:var(--panel); border:1px solid var(--border); border-radius:10px; width:90vw; max-width:900px; }
+  .modal { background:var(--panel); border:1px solid var(--border); border-radius:10px; width:92vw; max-width:920px; max-height:90vh; display:flex; flex-direction:column; }
+  .modal.wide { max-width:1100px; }
   .modal-head { display:flex; justify-content:space-between; align-items:center; padding:12px 18px; border-bottom:1px solid var(--border); }
   .modal-head h3 { font-size:14px; }
   .modal-head button { background:none; border:none; color:var(--dim); font-size:20px; cursor:pointer; }
   .modal-head button:hover { color:var(--red); }
+  .modal-body { padding:16px 18px; overflow:auto; }
   #termContainer { padding:12px; height:500px; }
+  .mform .row { display:flex; flex-direction:column; gap:4px; margin-bottom:12px; }
+  .mform label { font-size:12px; color:var(--dim); }
+  .mform input, .mform textarea, .mform select { background:var(--bg); color:var(--text); border:1px solid var(--border); border-radius:6px; padding:8px 10px; font:inherit; font-size:13px; }
+  .mform textarea { font-family:monospace; resize:vertical; }
+  .row2 { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  @media (max-width:700px) { .row2 { grid-template-columns:1fr; } }
+  table { width:100%; border-collapse:collapse; font-size:12px; }
+  th, td { text-align:left; padding:6px 8px; border-bottom:1px solid var(--border); vertical-align:top; }
+  th { color:var(--dim); font-weight:600; font-size:11px; text-transform:uppercase; letter-spacing:.5px; }
+  td.mono { font-family:monospace; }
+  .btn { background:var(--accent); color:var(--bg); border:none; padding:6px 14px; border-radius:6px; font-weight:600; cursor:pointer; font-size:12px; }
+  .btn.ghost { background:var(--panel); color:var(--text); border:1px solid var(--border); }
+  .btn.danger { background:rgba(248,113,113,.15); color:var(--red); border:1px solid var(--red); }
+  .btn:disabled { opacity:.5; cursor:not-allowed; }
+  .chips { display:flex; flex-wrap:wrap; gap:6px; margin:8px 0; }
+  .chip { display:flex; align-items:center; gap:6px; background:var(--bg); border:1px solid var(--border); padding:4px 10px; border-radius:14px; font-size:12px; cursor:pointer; }
+  .chip.checked { border-color:var(--accent); color:var(--accent); }
+  .result-block { background:var(--bg); border:1px solid var(--border); border-radius:6px; padding:10px 12px; margin-bottom:8px; font-family:monospace; font-size:12px; white-space:pre-wrap; max-height:180px; overflow:auto; }
+  .result-block .head { color:var(--accent); margin-bottom:4px; }
+  .result-block.code-0 .head { color:var(--green); }
+  .result-block.code-0 { border-left-color:var(--green); border-left:3px solid; }
+  .result-block.err .head { color:var(--red); background:rgba(248,113,113,.08); }
+  .fs-row { display:flex; align-items:center; gap:10px; padding:6px 8px; border-radius:6px; font-size:13px; cursor:pointer; }
+  .fs-row:hover { background:rgba(255,255,255,.04); }
+  .fs-row .ic { width:22px; text-align:center; color:var(--dim); }
+  .fs-row.dir .ic { color:var(--yellow); }
+  .fs-row .meta { margin-left:auto; color:var(--dim); font-size:11px; font-family:monospace; white-space:nowrap; }
+  .fs-path { font-family:monospace; background:var(--bg); border:1px solid var(--border); border-radius:6px; padding:8px 10px; font-size:12px; margin-bottom:10px; word-break:break-all; }
+  .progress { width:100%; }
+  .qr-img { width:260px; height:260px; image-rendering:pixelated; background:#fff; border-radius:10px; }
+  .qr-box { display:flex; align-items:center; gap:24px; flex-wrap:wrap; }
+  .qr-url { font-family:monospace; color:var(--accent); font-size:14px; margin-bottom:4px; }
+  .hlist { list-style:none; }
+  .hlist li { display:flex; justify-content:space-between; gap:10px; padding:8px 10px; border-radius:6px; font-size:12px; }
+  .hlist li:nth-child(odd) { background:rgba(255,255,255,.02); }
+  .hlist .cmd { font-family:monospace; flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .hlist .time { color:var(--dim); }
+  .biglog { font-family:monospace; font-size:12px; background:var(--bg); border:1px solid var(--border); border-radius:6px; padding:12px; white-space:pre-wrap; word-break:break-all; max-height:60vh; overflow:auto; }
+  .legend { font-size:11px; color:var(--dim); margin-top:10px; }
+  .legend b { color:var(--text); }
 </style>
 </head>
 <body>
@@ -72,6 +126,12 @@
   <div class="repo-bar">
     <span class="commit" id="commitText">—</span>
     <span id="updateBadge" style="display:none" class="update">● güncelleme var</span>
+  </div>
+  <div class="topbar-actions">
+    <button class="tbtn" onclick="openQr()">◈ Mobil</button>
+    <button class="tbtn" onclick="openBatch()">» Komut</button>
+    <button class="tbtn" onclick="openHistory()">⇄ Kayıt</button>
+    <button class="tbtn" onclick="openSettings()">⚙ Ayarlar</button>
   </div>
 </div>
 
@@ -85,8 +145,12 @@
       <div id="netBody"><div class="net-empty">Keşif devam ediyor...</div></div>
     </div>
     <div class="log">
-      <h3>GÜNLÜK</h3>
+      <h3>GÜNLÜK · UYARILAR</h3>
       <div class="log-body" id="logBody"></div>
+    </div>
+    <div class="history">
+      <h3>SON KOMUTLAR</h3>
+      <div id="histBody"><div class="net-empty">Henüz komut çalıştırılmadı.</div></div>
     </div>
   </div>
 </div>
@@ -102,6 +166,17 @@
   </div>
 </div>
 
+<!-- Generic modal -->
+<div class="modal-overlay" id="modal">
+  <div class="modal" id="modalShell">
+    <div class="modal-head">
+      <h3 id="mTitle"></h3>
+      <button id="mClose">×</button>
+    </div>
+    <div class="modal-body" id="mBody"></div>
+  </div>
+</div>
+
 <script src="/xterm/lib/xterm.js"></script>
 <script src="/xterm-addon-fit/lib/addon-fit.js"></script>
 <script src="/socket.io/socket.io.js"></script>
@@ -111,9 +186,24 @@ const grid = document.getElementById('agentGrid');
 const logBody = document.getElementById('logBody');
 const commitText = document.getElementById('commitText');
 const updateBadge = document.getElementById('updateBadge');
-let termApp = null, termFit = null, termId = null, termAgentId = null;
+const histBody = document.getElementById('histBody');
+let termApp = null, termFit = null, termId = null;
 let agentsCache = [];
+let fsState = { agentId: null, hostname: null, path: '' };
+let procTimer = null;
+let procAgentId = null;
 
+function esc(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+}
+function fmtTime(ms) { return ms ? new Date(ms).toLocaleTimeString('tr') : '—'; }
+function fmtSize(n) {
+  if (n == null) return '';
+  if (n >= 1e9) return (n/1e9).toFixed(1)+' GB';
+  if (n >= 1e6) return (n/1e6).toFixed(1)+' MB';
+  if (n >= 1e3) return (n/1e3).toFixed(1)+' KB';
+  return n+' B';
+}
 function uptimeFmt(s) {
   if (!s) return '—';
   const d = Math.floor(s/86400), h = Math.floor(s%86400/3600), m = Math.floor(s%3600/60);
@@ -121,6 +211,11 @@ function uptimeFmt(s) {
 }
 function fmtKB(kb) { return kb > 1024 ? (kb/1024).toFixed(1)+' MB/s' : kb.toFixed(1)+' KB/s'; }
 function fillColor(v, y, r) { return v >= (r||90) ? 'var(--red)' : v >= (y||75) ? 'var(--yellow)' : 'var(--accent)'; }
+function cardClass(s) {
+  if (!s) return '';
+  const h = Math.max(s.cpu||0, s.ram||0, s.disk||0);
+  return h >= 90 ? 'crit' : h >= 75 ? 'warn' : '';
+}
 
 function renderAgents(list) {
   agentsCache = list || [];
@@ -130,13 +225,13 @@ function renderAgents(list) {
     const net = s.netOnline ? `<span class="net-badge net-online">● online</span>` : `<span class="net-badge net-offline">● offline</span>`;
     const dlPct = Math.min(Math.max((s.netRx || 0) / 10, 0), 100);
     const ulPct = Math.min(Math.max((s.netTx || 0) / 10, 0), 100);
-    return `<div class="card">
+    return `<div class="card ${cardClass(s)}">
       ${net}
-      <h3>${a.hostname}</h3>
-      <div class="sub">${a.osDistro || a.platform} · ${a.ip}</div>
+      <h3>${esc(a.hostname)}</h3>
+      <div class="sub">${esc(a.osDistro || a.platform)} · ${esc(a.ip)}</div>
       <div class="sysinfo">
-        ${a.cpuModel ? `CPU: <span>${a.cpuModel}</span> (${a.cpuCores} çekirdek)<br>` : ''}
-        ${a.ramTotal ? `RAM: <span>${a.ramTotal} GB</span> · ` : ''}${a.manufacturer ? `Donanım: <span>${a.manufacturer}</span>` : ''}
+        ${a.cpuModel ? `CPU: <span>${esc(a.cpuModel)}</span> (${a.cpuCores} çekirdek)<br>` : ''}
+        ${a.ramTotal ? `RAM: <span>${a.ramTotal} GB</span> · ` : ''}${a.manufacturer ? `Donanım: <span>${esc(a.manufacturer)}</span>` : ''}
       </div>
       <div class="bars">
         <div class="bar"><span class="label">CPU</span><span class="track"><span class="fill" style="width:${s.cpu||0}%;background:${fillColor(s.cpu||0,75,90)}"></span></span><span class="val">${s.cpu||0}%</span></div>
@@ -145,9 +240,12 @@ function renderAgents(list) {
         <div class="bar"><span class="label">DL</span><span class="track"><span class="fill" style="width:${dlPct}%;background:var(--green)"></span></span><span class="val">${fmtKB(s.netRx||0)}</span></div>
         <div class="bar"><span class="label">UL</span><span class="track"><span class="fill" style="width:${ulPct}%;background:var(--yellow)"></span></span><span class="val">${fmtKB(s.netTx||0)}</span></div>
       </div>
-      <div class="footer">
-        <span>açık: ${uptimeFmt(s.uptime)}</span>
-        <button class="term-btn" onclick="openTerm('${a.id}','${a.hostname}')">⟶ Terminal</button>
+      <div class="footer"><span>açık: ${uptimeFmt(s.uptime)}</span><span id="online-${esc(a.hostname)}"></span></div>
+      <div class="card-actions">
+        <button class="term-btn" onclick="openTerm('${a.id}','${esc(a.hostname)}')">Terminal</button>
+        <button class="term-btn ghost" onclick="openProcesses('${a.id}','${esc(a.hostname)}')">İşlemler</button>
+        <button class="term-btn ghost" onclick="openFiles('${a.id}','${esc(a.hostname)}')">Dosyalar</button>
+        <button class="term-btn danger" onclick="restartAgent('${a.id}','${esc(a.hostname)}')">Yeniden Başlat</button>
       </div>
     </div>`;
   }).join('');
@@ -161,18 +259,330 @@ function updateAgentStats({ id, stats }) {
   renderAgents(agentsCache);
 }
 
-function logEntry(from, msg, isErr) {
+function logEntry(from, msg, kind) {
   const div = document.createElement('div');
-  div.className = 'entry' + (isErr ? ' error' : '');
-  div.innerHTML = `<span class="from">[${new Date().toLocaleTimeString('tr')}] ${from}</span> ${msg}`;
+  div.className = 'entry' + (kind ? ' ' + kind : '');
+  div.innerHTML = `<span class="from">[${new Date().toLocaleTimeString('tr')}] ${esc(from)}</span> ${esc(msg)}`;
   logBody.prepend(div);
-  while (logBody.children.length > 80) logBody.removeChild(logBody.lastChild);
+  while (logBody.children.length > 100) logBody.removeChild(logBody.lastChild);
+}
+
+// ===== Generic modal =====
+const modal = document.getElementById('modal');
+const mBody = document.getElementById('mBody');
+const mTitle = document.getElementById('mTitle');
+document.getElementById('mClose').onclick = closeModal;
+modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
+function showModal(title, html, wide) {
+  mTitle.textContent = title;
+  mBody.innerHTML = html;
+  document.getElementById('modalShell').classList.toggle('wide', !!wide);
+  modal.classList.add('active');
+}
+function closeModal() {
+  if (procTimer) { clearInterval(procTimer); procTimer = null; }
+  modal.classList.remove('active');
+}
+
+// ===== QR / Mobile access =====
+async function openQr() {
+  try {
+    const r = await fetch('/api/hostinfo').then(x => x.json());
+    const ip = r.host;
+    showModal(`Mobil Erişim — ${esc(r.hostname)}`, `
+      <div class="qr-box">
+        <div>
+          <div class="qr-url" id="qrUrl">${esc(r.url)}</div>
+          <div class="legend">LAN: ${r.lanIPs.map(esc).join(', ') || '—'}${r.tailscaleIP ? '<br>Tailscale: <b>' + esc(r.tailscaleIP) + '</b>' : ''}</div>
+          <div class="mform" style="margin-top:14px">
+            <label>Farklı adres (ör. tailscale: <b>${esc(r.tailscaleIP || '')}</b> veya IP)</label>
+            <input id="qrHostInput" value="${esc(r.host)}" placeholder="192.168.1.10">
+            <button class="btn" style="margin-top:8px" onclick="qrUpdate()">QR Yenile</button>
+          </div>
+        </div>
+        <img id="qrImg" class="qr-img" alt="QR" src="/api/qr?host=${encodeURIComponent(r.host)}">
+      </div>`, true);
+    window._qrHost = r.host;
+    document.getElementById('qrUrl').textContent = r.url;
+  } catch (e) { logEntry('QR', e.message, 'error'); }
+}
+function qrUpdate() {
+  const host = document.getElementById('qrHostInput').value.trim() || window._qrHost;
+  document.getElementById('qrImg').src = `/api/qr?host=${encodeURIComponent(host)}`;
+}
+
+// ===== Batch / single command =====
+function openBatch(agentId, hostname) {
+  const ids = agentId ? [agentId] : agentsCache.map(a => a.id);
+  const labels = agentId ? [hostname] : agentsCache.map(a => a.hostname);
+  const checks = agentsCache.map((a, i) =>
+    `<label class="chip ${!agentId ? 'checked' : ''}">
+      <input type="checkbox" data-id="${a.id}" ${!agentId ? 'checked' : ''} style="accent-color:var(--accent)">
+      ${esc(a.hostname)}
+    </label>`).join('');
+  showModal(agentId ? `Komut — ${esc(hostname)}` : 'Toplu Komut', `
+    <div class="mform">
+      <div class="row"><label>Cihazlar</label><div class="chips" id="batchChips">${checks || '<div class="net-empty">Agent yok</div>'}</div></div>
+      <div class="row"><label>Komut (whitelist'e takılırsa engellenir)</label>
+        <textarea id="bcCmd" rows="2" placeholder="ör. df -h"></textarea></div>
+      <div class="row2">
+        <div class="row"><label>Dizin (opsiyonel)</label><input id="bcCwd" placeholder="${esc(navigator.userAgent.includes('Win') ? 'C:\\Users' : '~')}"></div>
+        <div class="row"><label>Zaman aşımı (sn)</label><input id="bcTimeout" type="number" value="30"></div>
+      </div>
+      <button class="btn" id="bcRun" onclick="runBatch()">Çalıştır</button>
+    </div>
+    <div id="bcResults" style="margin-top:14px"></div>`, true);
+}
+async function runBatch() {
+  const ids = [...document.querySelectorAll('#batchChips input:checked')].map(i => i.dataset.id);
+  const command = document.getElementById('bcCmd').value.trim();
+  const cwd = document.getElementById('bcCwd').value.trim();
+  const timeout = parseInt(document.getElementById('bcTimeout').value, 10) || 30;
+  const btn = document.getElementById('bcRun');
+  if (!ids.length || !command) { alert('Komut ve cihaz seçin'); return; }
+  btn.disabled = true; btn.textContent = 'Çalışıyor...';
+  const div = document.getElementById('bcResults');
+  div.innerHTML = '<div class="result-block"><div class="head">gönderiliyor...</div></div>';
+  try {
+    const res = await fetch('/api/run', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ agentIds: ids, command, cwd, timeout }),
+    }).then(r => r.json());
+    const names = [];
+    for (const a of agentsCache) names[a.id] = a.hostname;
+    div.innerHTML = Object.entries(res).map(([id, r]) => {
+      const name = names[id] || '?';
+      if (!r.ok) return `<div class="result-block err"><div class="head">${esc(name)} — hata</div>${esc(r.error || '')}</div>`;
+      const out = r.data.stdout || '(çıktı yok)';
+      const err = r.data.stderr ? '\n[stderr]\n' + r.data.stderr : '';
+      const cls = r.data.code === 0 ? 'code-0' : 'err';
+      return `<div class="result-block ${cls}">
+        <div class="head">${esc(name)} · çıkış kodu ${r.data.code}</div>${esc(out)}${esc(err)}
+      </div>`;
+    }).join('') || '<div class="net-empty">Sonuç yok</div>';
+  } catch (e) {
+    div.innerHTML = `<div class="result-block err"><div class="head">hata</div>${esc(e.message)}</div>`;
+  }
+  btn.disabled = false; btn.textContent = 'Çalıştır';
+}
+
+// ===== Process manager =====
+function openProcesses(agentId, hostname) {
+  procAgentId = agentId;
+  showModal(`İşlemler — ${esc(hostname)}`, `<div id="procBody"><div class="net-empty">Yükleniyor...</div></div>`, true);
+  loadProcs();
+  if (procTimer) clearInterval(procTimer);
+  procTimer = setInterval(loadProcs, 4000);
+  window.addEventListener('beforeunload', () => { if (procTimer) clearInterval(procTimer); });
+}
+async function loadProcs() {
+  if (!procAgentId) return;
+  try {
+    const list = await fetch('/api/processes/' + procAgentId).then(r => r.json());
+    const body = document.getElementById('procBody');
+    if (!body) return;
+    const sorted = list.slice().sort((a, b) => b.cpu - a.cpu);
+    body.innerHTML = `<table>
+      <tr><th>PID</th><th>İsim</th><th>CPU</th><th>RAM MB</th><th>Komut</th><th></th></tr>
+      ${sorted.map(p => `<tr>
+        <td class="mono">${p.pid}</td>
+        <td>${esc(p.name)}</td>
+        <td>${p.cpu}%</td>
+        <td>${p.mem}</td>
+        <td class="mono" title="${esc(p.command)}">${esc((p.command||'').slice(0,60))}</td>
+        <td><button class="term-btn danger" onclick="killProc(${p.pid})">Kill</button></td>
+      </tr>`).join('')}
+    </table>`;
+  } catch (e) {
+    const body = document.getElementById('procBody');
+    if (body) body.innerHTML = `<div class="result-block err">${esc(e.message)}</div>`;
+  }
+}
+async function killProc(pid) {
+  if (!pid) return;
+  try {
+    await fetch('/api/kill', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ agentId: procAgentId, pid }) });
+    loadProcs();
+  } catch (e) { alert(e.message); }
+}
+
+// ===== File explorer =====
+async function openFiles(agentId, hostname) {
+  fsState = { agentId, hostname, path: '' };
+  showModal(`Dosyalar — ${esc(hostname)}`, `<div id="fsBody"><div class="net-empty">Yükleniyor...</div></div>`, true);
+  fsLoad('/');
+}
+async function fsLoad(p) {
+  const body = document.getElementById('fsBody');
+  if (!body) return;
+  fsState.path = p || '';
+  body.innerHTML = '<div class="net-empty">Yükleniyor...</div>';
+  try {
+    const d = await fetch(`/api/fs?agent=${encodeURIComponent(fsState.agentId)}&path=${encodeURIComponent(p || '')}`).then(r => r.json());
+    if (d.error) throw new Error(d.error);
+    const rows = d.items.map(i => {
+      const newPath = fsState.path + (fsState.path && !/[/\\]$/.test(fsState.path) ? (fsState.path.includes('\\') ? '\\' : '/') : '') + i.name;
+      if (i.type === 'dir') {
+        return `<div class="fs-row dir" onclick="fsLoad(&quot;${esc(newPath)}&quot;)">
+          <span class="ic">▸</span><span>${esc(i.name)}</span>
+          <span class="meta"></span>
+        </div>`;
+      }
+      return `<div class="fs-row" onclick="fsDownload(&quot;${esc(newPath)}&quot;)">
+        <span class="ic">✛</span><span>${esc(i.name)}</span>
+        <span class="meta">${fmtSize(i.size)} · ${fmtTime(i.mtime)}</span>
+      </div>`;
+    }).join('');
+    body.innerHTML = `
+      <div class="fs-path" id="fsPath">${esc(fsState.path || '/')}</div>
+      <div class="card-actions" style="margin-bottom:10px">
+        ${fsState.path ? `<button class="term-btn ghost" onclick="fsParent()">↑ Üst dizin</button>` : ''}
+        <label class="term-btn ghost" style="display:inline-block;cursor:pointer">⬆ Yükle
+          <input type="file" id="fsFile" style="display:none" onchange="fsUpload()">
+        </label>
+        <button class="term-btn" onclick="fsRefresh()">↻ Yenile</button>
+      </div>
+      ${rows || '<div class="net-empty">Boş dizin</div>'}`;
+  } catch (e) {
+    body.innerHTML = `<div class="result-block err">${esc(e.message)}</div>`;
+  }
+}
+function fsParent() {
+  const pp = fsState.path.replace(/[\\/]+$/, '');
+  if (!pp) return;
+  const idx = Math.max(pp.lastIndexOf('/'), pp.lastIndexOf('\\'));
+  fsLoad(idx <= 0 ? '' : pp.slice(0, idx));
+}
+function fsRefresh() { fsLoad(fsState.path); }
+function fsDownload(path) {
+  window.open(`/api/download?agent=${encodeURIComponent(fsState.agentId)}&path=${encodeURIComponent(path)}`, '_blank');
+}
+async function fsUpload() {
+  const input = document.getElementById('fsFile');
+  if (!input || !input.files || !input.files[0]) return;
+  const file = input.files[0];
+  const dest = fsState.path + (fsState.path && !fsState.path.endsWith('/') && !fsState.path.endsWith('\\') ? '/' : '') + file.name;
+  try {
+    await fetch(`/api/upload?agent=${encodeURIComponent(fsState.agentId)}&path=${encodeURIComponent(dest)}`, { method: 'POST', body: file });
+    logEntry('Dosya', `${file.name} → ${fsState.hostname}:${dest}`, '');
+    fsRefresh();
+  } catch (e) { alert(e.message); }
+}
+
+// ===== Restart agent =====
+async function restartAgent(agentId, hostname) {
+  if (!confirm(`${hostname} yeniden başlatılsın mı?`)) return;
+  try {
+    await fetch('/api/restart/' + agentId, { method: 'POST' });
+    logEntry('Yeniden Başlat', `${hostname} başlatılıyor...`, 'warn');
+  } catch (e) { alert(e.message); }
+}
+
+// ===== History: commands + terminal logs =====
+async function openHistory() {
+  showModal('Kayıtlar — Komut Geçmişi & Terminal Oturumları', '<div class="net-empty">Yükleniyor...</div>', true);
+  const names = {};
+  for (const a of agentsCache) names[a.id] = a.hostname;
+  try {
+    const [hist, logs] = await Promise.all([
+      fetch('/api/history').then(r => r.json()),
+      fetch('/api/logs').then(r => r.json()),
+    ]);
+    const histRows = hist.map(h => h.list.map((c, i) => `
+      <li>
+        <span class="cmd">${esc(c.command)}</span>
+        <span class="time">${names[h.id] || h.id.slice(0,8)} · ${new Date(c.ts).toLocaleTimeString('tr')} · kod ${c.code}</span>
+      </li>`).join('')).join('');
+    const logRows = logs.map(l => `
+      <li>
+        <span class="cmd">${esc(l.hostname)} · ${l.start ? new Date(l.start).toLocaleString('tr') : '—'} · ${fmtSize(l.chars)}</span>
+        <button class="term-btn ghost" onclick="viewLog('${l.termId}')">Görüntüle</button>
+      </li>`).join('');
+    const body = document.getElementById('mBody');
+    body.innerHTML = `
+      <h3 style="font-size:13px;color:var(--dim);margin:6px 0 8px">KOMUT GEÇMİŞİ</h3>
+      <ul class="hlist">${histRows || '<li><span class="cmd">—</span></li>'}</ul>
+      <h3 style="font-size:13px;color:var(--dim);margin:18px 0 8px">TERMİNAL OTURUMLARI</h3>
+      <ul class="hlist">${logRows || '<li><span class="cmd">—</span></li>'}</ul>`;
+  } catch (e) {
+    const body = document.getElementById('mBody');
+    if (body) body.innerHTML = `<div class="result-block err">${esc(e.message)}</div>`;
+  }
+}
+async function viewLog(termId) {
+  try {
+    const text = await fetch('/api/logs/' + termId).then(r => r.text());
+    showModal('Terminal Oturumu', `<pre class="biglog">${esc(text) || '(boş)'}</pre>`, true);
+  } catch (e) { alert(e.message); }
+}
+
+// ===== Settings =====
+async function openSettings() {
+  showModal('Ayarlar', '<div class="net-empty">Yükleniyor...</div>');
+  try {
+    const cfg = await fetch('/api/config').then(r => r.json());
+    const body = document.getElementById('mBody');
+    body.innerHTML = `
+      <div class="mform">
+        <h3 style="font-size:13px;color:var(--dim);margin-bottom:8px">KOMUT WHITELIST (satır başına bir komut — boş = her şey serbest)</h3>
+        <div class="row"><textarea id="stWhitelist" rows="5">${esc((cfg.whitelist||[]).join('\n'))}</textarea></div>
+        <h3 style="font-size:13px;color:var(--dim);margin:18px 0 8px">EŞİK DEĞERLERİ (%) — aşılırsa bildirim + UI uyarısı</h3>
+        <div class="row2">
+          <div class="row"><label>CPU</label><input id="stCpu" type="number" value="${cfg.thresholds && cfg.thresholds.cpu != null ? cfg.thresholds.cpu : ''}"></div>
+          <div class="row"><label>RAM</label><input id="stRam" type="number" value="${cfg.thresholds && cfg.thresholds.ram != null ? cfg.thresholds.ram : ''}"></div>
+          <div class="row"><label>Disk</label><input id="stDisk" type="number" value="${cfg.thresholds && cfg.thresholds.disk != null ? cfg.thresholds.disk : ''}"></div>
+          <div class="row"><label>Çevrimdışı (sn)</label><input id="stOff" type="number" value="${cfg.thresholds && cfg.thresholds.offline != null ? cfg.thresholds.offline : ''}"></div>
+        </div>
+        <h3 style="font-size:13px;color:var(--dim);margin:18px 0 8px">BİLDİRİM (Telegram + Discord — boş bırakılırsa devre dışı)</h3>
+        <div class="row"><label>Telegram Bot Token</label><input id="stTgToken" value="${esc((cfg.notify&&cfg.notify.telegram&&cfg.notify.telegram.token)||'')}" placeholder="123456:ABC..."></div>
+        <div class="row"><label>Telegram Chat ID</label><input id="stTgChat" value="${esc((cfg.notify&&cfg.notify.telegram&&cfg.notify.telegram.chatId)||'')}"></div>
+        <div class="row"><label>Discord Webhook</label><input id="stDcUrl" value="${esc((cfg.notify&&cfg.notify.discord&&cfg.notify.discord.webhook)||'')}" placeholder="https://discord.com/api/webhooks/..."></div>
+        <div class="row"><label>QR adresi zorla (opsiyonel — ör. tailscale IP)</label><input id="stQr" value="${esc(cfg.qrHost||'')}"></div>
+        <div class="legend">Not: komut whitelist'i bu hub'ın UI'ından çalışan komutlar için geçerlidir. Kaydedince ağdaki tüm agent'lara da yansır.</div>
+        <button class="btn" onclick="saveSettings()">Kaydet</button>
+      </div>`;
+  } catch (e) {
+    const body = document.getElementById('mBody');
+    if (body) body.innerHTML = `<div class="result-block err">${esc(e.message)}</div>`;
+  }
+}
+async function saveSettings() {
+  const body = {
+    whitelist: document.getElementById('stWhitelist').value.split('\n').map(s => s.trim()).filter(Boolean),
+    thresholds: {
+      cpu: parseInt(document.getElementById('stCpu').value, 10) || 0,
+      ram: parseInt(document.getElementById('stRam').value, 10) || 0,
+      disk: parseInt(document.getElementById('stDisk').value, 10) || 0,
+      offline: parseInt(document.getElementById('stOff').value, 10) || 0,
+    },
+    notify: {
+      telegram: { token: document.getElementById('stTgToken').value.trim(), chatId: document.getElementById('stTgChat').value.trim() },
+      discord: { webhook: document.getElementById('stDcUrl').value.trim() },
+    },
+    qrHost: document.getElementById('stQr').value.trim(),
+  };
+  try {
+    await fetch('/api/config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    logEntry('Ayarlar', 'kaydedildi', '');
+    closeModal();
+  } catch (e) { alert(e.message); }
+}
+
+function renderHistory(data) {
+  const names = {};
+  for (const a of agentsCache) names[a.id] = a.hostname;
+  const rows = (data || []).flatMap(h => (h.list || []).slice(-5).map(c => ({ id: h.id, ...c }))).slice(-8).reverse();
+  histBody.innerHTML = rows.length ? rows.map(c =>
+    `<div style="font-family:monospace;font-size:11px;padding:4px 0;border-bottom:1px dashed var(--border)">
+       <span style="color:var(--dim)">${esc(names[c.id] || c.id.slice(0,8))} · ${new Date(c.ts).toLocaleTimeString('tr')}</span><br>
+       <span style="color:var(--text)">${esc(c.command)}</span>
+     </div>`).join('') : '<div class="net-empty">Henüz komut çalıştırılmadı.</div>';
 }
 
 // Terminal
 function openTerm(agentId, hostname) {
   if (termApp) closeTerm();
-  termAgentId = agentId;
   termId = 't' + Date.now();
   document.getElementById('termTitle').textContent = `Terminal: ${hostname}`;
   document.getElementById('termModal').classList.add('active');
@@ -190,7 +600,7 @@ function openTerm(agentId, hostname) {
 function closeTerm() {
   if (termId) socket.emit('term-close', { termId });
   if (termApp) { termApp.dispose(); termApp = null; }
-  termId = null; termAgentId = null;
+  termId = null;
   document.getElementById('termModal').classList.remove('active');
 }
 
@@ -198,30 +608,41 @@ socket.on('term-output', ({ termId: tid, data }) => { if (termApp && tid === ter
 socket.on('term-exit', () => closeTerm());
 socket.on('agent-list', renderAgents);
 socket.on('stats-update', updateAgentStats);
+socket.on('history-update', renderHistory);
+socket.on('alert', ({ hostname, metric, value, limit }) => {
+  const ic = metric.toUpperCase().replace('_', ' ');
+  logEntry('UYARI', `${hostname}: ${ic} ${metric === 'offline' || metric === 'online' ? '' : value + '%'} (eşik %' + limit + ')`, metric === 'online' ? '' : 'warn');
+});
 socket.on('repo-info', (i) => {
   commitText.textContent = i.commit ? `${i.branch||''}@${i.commit}` : 'git yok';
   updateBadge.style.display = i.update ? '' : 'none';
 });
-socket.on('update-status', ({from, stage, msg}) => logEntry(from, `${stage}: ${msg}`, stage === 'error'));
+socket.on('update-status', ({from, stage, msg}) => logEntry(from, `${stage}: ${msg}`, stage === 'error' ? 'error' : (stage === 'start' || stage === 'restart' ? 'warn' : '')));
 
-// Live stats refresh
 setInterval(() => fetch('/api/agents').then(r=>r.json()).then(renderAgents).catch(()=>{}), 1000);
 
-// LAN discovery: show hubs/agents found on the subnet
 const netBody = document.getElementById('netBody');
 function renderNetwork(list) {
   if (!list || !list.length) { netBody.innerHTML = '<div class="net-empty">Ağda cihaz bulunamadı.</div>'; return; }
   netBody.innerHTML = list.map(p => `
     <div class="net-item">
       <span class="tag ${p.role}">${p.role}</span>
-      <span class="who"><b>${p.hostname}</b> <span class="ip">${p.name||''} · ${p.src||p.ip}</span></span>
+      <span class="who"><b>${esc(p.hostname)}</b> <span class="ip">${esc(p.name||'')} · ${esc(p.src||p.ip)}</span></span>
       <span style="color:var(--dim);font-size:11px">${new Date(p.lastSeen).toLocaleTimeString('tr')}</span>
     </div>`).join('');
 }
 setInterval(() => fetch('/api/network').then(r=>r.json()).then(renderNetwork).catch(()=>{}), 2000);
+setInterval(() => fetch('/api/history').then(r=>r.json()).then(renderHistory).catch(()=>{}), 5000);
 
 document.getElementById('termClose').onclick = closeTerm;
-window.openTerm = openTerm;
+
+// global exposure for inline handlers
+Object.assign(window, { openTerm, openBatch, openProcesses, openFiles, openHistory, openQr, openSettings, closeModal, restartAgent, qrUpdate, runBatch, fsLoad, fsParent, fsDownload, fsRefresh, fsUpload, killProc, saveSettings, viewLog });
+
+// PWA
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/sw.js').catch(() => {});
+}
 </script>
 </body>
 </html>

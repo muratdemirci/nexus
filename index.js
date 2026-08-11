@@ -28,6 +28,16 @@ function parseArgs() {
 }
 
 const cfg = parseArgs();
+
+// Service install/uninstall short-circuits everything else.
+if (process.argv.includes('--install') || process.argv.includes('--uninstall')) {
+  const { installService, uninstallService } = require('./svc');
+  const r = process.argv.includes('--install') ? installService() : uninstallService();
+  console.log(`\n  [Servis] ${r.msg || r.error}`);
+  if (!r.ok && r.error) console.log(`  Hata: ${r.error}`);
+  process.exit(r.ok ? 0 : 1);
+}
+
 console.log(`\n  NEXUS  —  mod: ${cfg.mode.toUpperCase()}\n  ${cfg.mode !== 'agent' ? `hub: http://localhost:${cfg.port}` : `agent -> ${cfg.hub} (${cfg.name})`} | keşif: ${cfg.discover ? 'LAN açık' : 'kapalı'}\n`);
 
 // OS-aware firewall check/setup (auto at startup unless --no-firewall).

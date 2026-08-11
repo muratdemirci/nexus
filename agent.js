@@ -5,12 +5,23 @@ const path = require("path");
 const si = require("systeminformation");
 const dns = require("dns").promises;
 const pty = require("node-pty");
+const ex = require("./exec");
 const { git, restart } = require("./utils");
 const { startScanner } = require("./discovery");
 
 function gb(bytes) {
   return +(bytes / 1073741824).toFixed(1);
 }
+
+function loadConfig() {
+  try {
+    return JSON.parse(fs.readFileSync(path.join(__dirname, "config.json"), "utf8"));
+  } catch {
+    return {};
+  }
+}
+
+let agentConfig = loadConfig();
 
 // node-pty ships its macOS spawn-helper without the execute bit (and sometimes
 // with a quarantine attribute), which makes pty.spawn throw "posix_spawnp
@@ -169,9 +180,16 @@ function startAgent(
 
     socket.on("connect", () => {
       console.log(`[Agent] Hub: ${socket.id} @ ${url}`);
+      socket.emit("hello", { hostname });
       timer = setInterval(() => report(socket), intervalMs);
       netTimer = setInterval(() => checkInternet(socket), 10000);
       checkInternet(socket); // immediate first check
+    });
+
+    socket.on("config-push", (cfg) => {
+      if (cfg && typeof cfg === "object") {
+        agentConfig = { ...agentConfig, ...cfg };
+      }
     });
 
     socket.on("disconnect", () => {
@@ -456,6 +474,65 @@ function startAgent(
           term.kill();
         } catch {}
         shells.delete(termId);
+      }
+    });
+
+    // ===== Remote ops (command, processes, files, restart) =====
+    socket.on("op", async ({ opId, op, payload = {} }) => {
+      const fail = (err) => {
+        console.warn(`[Agent] op ${op} başarısız: ${err && err.message}`);
+        socket.emit("op-result", { opId, ok: false, error: err && err.message });
+      };
+      try {
+        switch (op) {
+          case "run": {
+            const r = await ex.runCommand(payload.command, {
+              cwd: payload.cwd,
+              timeout: payload.timeout || 30000,
+              whitelist: agentConfig.whitelist,
+            });
+            socket.emit("op-result", { opId, ok: true, data: r });
+            break;
+          }
+          case "ps":
+            socket.emit("op-result", { opId, ok: true, data: await ex.listProcesses() });
+            break;
+          case "kill":
+            await ex.killProcess(payload.pid, payload.signal);
+            socket.emit("op-result", { opId, ok: true, data: { killed: payload.pid } });
+            break;
+          case "fs-list":
+            socket.emit("op-result", { opId, ok: true, data: await ex.listDir(payload.path) });
+            break;
+          case "fs-read":
+            socket.emit("op-result", { opId, ok: true, data: await ex.readFile(payload.path) });
+            break;
+          case "fs-write":
+            socket.emit("op-result", { opId, ok: true, data: await ex.writeFile(payload.path, payload.data) });
+            break;
+          case "info":
+            socket.emit("op-result", {
+              opId,
+              ok: true,
+              data: {
+                hostname,
+                platform: os.platform(),
+                arch: process.arch,
+                node: process.version,
+                cwd: repoDir,
+                up: process.uptime(),
+              },
+            });
+            break;
+          case "restart":
+            socket.emit("op-result", { opId, ok: true, data: { restarting: true } });
+            setTimeout(() => restart(process.argv.slice(2)), 500);
+            break;
+          default:
+            fail(new Error(`bilinmeyen op: ${op}`));
+        }
+      } catch (e) {
+        fail(e);
       }
     });
 

@@ -1,0 +1,20 @@
+{
+  "whitelist": [],
+  "thresholds": {
+    "cpu": 90,
+    "ram": 90,
+    "disk": 90,
+    "offline": 60
+  },
+  "notify": {
+    "telegram": {
+      "token": "",
+      "chatId": ""
+    },
+    "discord": {
+      "webhook": ""
+    }
+  },
+  "qrHost": "",
+  "tailscale": true
+}
