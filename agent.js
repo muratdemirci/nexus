@@ -1,5 +1,7 @@
 const { io } = require("socket.io-client");
+const fs = require("fs");
 const os = require("os");
+const path = require("path");
 const si = require("systeminformation");
 const dns = require("dns").promises;
 const pty = require("node-pty");
@@ -8,6 +10,50 @@ const { startScanner } = require("./discovery");
 
 function gb(bytes) {
   return +(bytes / 1073741824).toFixed(1);
+}
+
+// node-pty ships its macOS spawn-helper without the execute bit (and sometimes
+// with a quarantine attribute), which makes pty.spawn throw "posix_spawnp
+// failed." Restore permissions on any native helper found, on every platform.
+function ensurePtyNative() {
+  const platform = os.platform();
+  if (platform === "win32") return true;
+
+  const roots = [
+    path.join(__dirname, "node_modules", "node-pty", "build", "Debug"),
+    path.join(__dirname, "node_modules", "node-pty", "build", "Release"),
+    path.join(
+      __dirname,
+      "node_modules",
+      "node-pty",
+      "prebuilds",
+      `${platform}-${process.arch}`,
+    ),
+  ];
+
+  const files = ["spawn-helper", "pty.node"];
+  let touched = 0;
+  for (const root of roots) {
+    for (const name of files) {
+      const file = path.join(root, name);
+      try {
+        if (!fs.existsSync(file)) continue;
+        fs.chmodSync(file, 0o755);
+        touched++;
+        if (platform === "darwin") {
+          try {
+            require("child_process").execFileSync(
+              "xattr",
+              ["-d", "com.apple.quarantine", file],
+              { stdio: "ignore", timeout: 3000 },
+            );
+          } catch {}
+        }
+      } catch {}
+    }
+  }
+  if (touched) console.log(`[Agent] node-pty native yardımcı düzeltildi (${touched} dosya)`);
+  return touched > 0;
 }
 
 function startAgent(
@@ -20,6 +66,7 @@ function startAgent(
   const repoDir = opts.repoDir || __dirname;
   const isWin = os.platform() === "win32";
   const discover = opts.discover !== false;
+  ensurePtyNative();
   // hubKey (hostname:port) -> { url, socket }
   const sockets = new Map();
 
@@ -219,12 +266,12 @@ function startAgent(
     }
 
     // ===== Terminal (real PTY via node-pty) =====
-    function getTerminalShell() {
+    function getTerminalShells() {
       const fs = require("fs");
       const path = require("path");
       const platform = os.platform();
 
-      const isRunnableShell = (candidate) => {
+      const exists = (candidate) => {
         if (!candidate || !candidate.trim()) return false;
         try {
           const ok =
@@ -237,133 +284,104 @@ function startAgent(
         }
       };
 
+      const exec = (candidate) => {
+        if (!exists(candidate)) return false;
+        if (platform === "win32") return true;
+        try {
+          fs.accessSync(candidate, fs.constants.X_OK);
+          return true;
+        } catch {
+          return false;
+        }
+      };
+
+      const argsOf = (shell) => {
+        const lower = shell.toLowerCase();
+        if (platform === "win32") {
+          if (lower.endsWith("bash.exe"))
+            return ["--login", "-i"];
+          if (lower.includes("powershell") || lower.includes("pwsh"))
+            return ["-NoLogo"];
+          return ["/K"];
+        }
+        return [];
+      };
+
+      const candidates = [];
+      const add = (list) => {
+        for (const c of list) {
+          if (c && !candidates.includes(c)) candidates.push(c);
+        }
+      };
+      const pick = (test) => candidates.filter(test);
+
       if (platform === "win32") {
         const home = process.env.USERPROFILE || process.env.HOME || "C:\\";
         const downloads = path.join(home, "Downloads");
-        const gitForWindowsShells = [
-          path.join(
-            downloads,
-            "Cmder",
-            "vendor",
-            "git-for-windows",
-            "usr",
-            "bin",
-            "bash.exe",
-          ),
-          path.join(
-            downloads,
-            "cmder",
-            "vendor",
-            "git-for-windows",
-            "usr",
-            "bin",
-            "bash.exe",
-          ),
-          path.join(
-            downloads,
-            "Cmder",
-            "vendor",
-            "git-for-windows",
-            "bin",
-            "bash.exe",
-          ),
-          path.join(
-            downloads,
-            "cmder",
-            "vendor",
-            "git-for-windows",
-            "bin",
-            "bash.exe",
-          ),
-          path.join(downloads, "Cmder", "vendor", "bin", "bash.exe"),
-          path.join(downloads, "cmder", "vendor", "bin", "bash.exe"),
-        ];
-
-        const shell = [
-          ...gitForWindowsShells,
+        for (const root of ["Cmder", "cmder"]) {
+          add([
+            path.join(downloads, root, "vendor", "git-for-windows", "usr", "bin", "bash.exe"),
+            path.join(downloads, root, "vendor", "git-for-windows", "bin", "bash.exe"),
+            path.join(downloads, root, "vendor", "bin", "bash.exe"),
+          ]);
+        }
+        add([
           process.env.ComSpec,
           "C:\\Windows\\System32\\cmd.exe",
           "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
           "C:\\Program Files\\PowerShell\\7\\pwsh.exe",
-          "powershell.exe",
-        ].find((candidate) => {
-          if (!candidate || !candidate.trim()) return false;
-          const lower = candidate.toLowerCase();
-          return (
-            lower.includes("bash.exe") ||
-            lower.includes("cmd.exe") ||
-            lower.includes("powershell") ||
-            lower.includes("pwsh") ||
-            isRunnableShell(candidate)
-          );
-        });
-
-        const resolved = shell || "C:\\Windows\\System32\\cmd.exe";
-        const lower = resolved.toLowerCase();
-        const args = lower.includes("bash.exe")
-          ? ["--login", "-i"]
-          : lower.includes("powershell") || lower.includes("pwsh")
-            ? ["-NoLogo"]
-            : ["/K"];
-        return { shell: resolved, args, reason: null };
+        ]);
+        const shells = pick(exists);
+        if (!shells.length) shells.push("C:\\Windows\\System32\\cmd.exe");
+        return { shells, argsOf };
       }
 
-      const macShells = [
-        process.env.SHELL,
-        "/bin/bash",
-        "/bin/zsh",
-        "/bin/sh",
-        "/usr/local/bin/bash",
-        "/opt/homebrew/bin/bash",
-        "/opt/homebrew/bin/zsh",
-        "/usr/local/bin/zsh",
-        "/usr/bin/bash",
-        "/usr/bin/zsh",
-      ].filter((candidate) => {
-        if (!candidate || !candidate.trim()) return false;
-        const lower = candidate.toLowerCase();
-        if (
-          lower.includes("terminal.app") ||
-          lower.includes("iterm") ||
-          lower.includes("app")
-        )
-          return false;
-        return isRunnableShell(candidate);
-      });
-
-      const shell = macShells[0] || null;
-      if (!shell) {
-        return {
-          shell: null,
-          args: [],
-          reason:
-            "No valid macOS shell found. Run: echo $SHELL; ls -l /bin/bash /bin/zsh /bin/sh; which bash; which zsh",
-        };
-      }
-
-      return { shell, args: ["-l", "-i"], reason: null };
+      const unixPool =
+        platform === "darwin"
+          ? [
+              process.env.SHELL,
+              "/bin/zsh",
+              "/bin/bash",
+              "/bin/sh",
+              "/usr/bin/zsh",
+              "/usr/bin/bash",
+              "/usr/local/bin/zsh",
+              "/usr/local/bin/bash",
+              "/opt/homebrew/bin/zsh",
+              "/opt/homebrew/bin/bash",
+            ]
+          : [
+              process.env.SHELL,
+              "/bin/bash",
+              "/bin/sh",
+              "/usr/bin/bash",
+              "/usr/bin/sh",
+              "/usr/bin/zsh",
+              "/bin/zsh",
+              "/usr/local/bin/bash",
+              "/usr/local/bin/zsh",
+            ];
+      add(unixPool);
+      const shells = pick(exec);
+      if (!shells.length) shells.push("/bin/sh");
+      return { shells, argsOf };
     }
 
     socket.on("term-init", ({ termId, cols, rows }) => {
-      const { shell, args, reason } = getTerminalShell();
-      console.log(
-        `[Agent] terminal shell: ${shell || "<none>"} ${args.join(" ")}`,
-      );
+      const fs = require("fs");
+      const { shells: shellList, argsOf } = getTerminalShells();
+      const home = os.homedir();
+      const cwd =
+        fs.existsSync(home) && fs.statSync(home).isDirectory() ? home : __dirname;
 
-      if (!shell) {
-        socket.emit("term-output", {
-          termId,
-          data: `\r\n\x1b[31mShell hatası: ${reason}\x1b[0m\r\n`,
-        });
-        return;
-      }
-
-      try {
+      const startTerm = (shell) => {
+        const args = argsOf(shell);
+        console.log(`[Agent] terminal shell: ${shell} ${args.join(" ")}`);
         const term = pty.spawn(shell, args, {
           name: "xterm-256color",
           cols: cols || 80,
           rows: rows || 24,
-          cwd: os.homedir(),
+          cwd,
           env: {
             ...process.env,
             TERM: "xterm-256color",
@@ -380,12 +398,37 @@ function startAgent(
           termId,
           data: `\x1b[36m=== Nexus Terminal: ${hostname} ===\x1b[0m\r\n`,
         });
-      } catch (e) {
-        socket.emit("term-output", {
-          termId,
-          data: `\r\n\x1b[31mShell hatası: ${e.message}\x1b[0m\r\n`,
-        });
+        return term;
+      };
+
+      let lastErr = null;
+      let healed = false;
+      for (const shell of shellList) {
+        try {
+          startTerm(shell);
+          return; // first successful shell wins
+        } catch (e) {
+          lastErr = e;
+          // macOS: spawn-helper without +x throws "posix_spawnp failed".
+          // Self-heal permissions once, then immediately retry this shell.
+          if (!healed) {
+            healed = true;
+            ensurePtyNative();
+            try {
+              startTerm(shell);
+              return;
+            } catch (e2) {
+              lastErr = e2;
+            }
+          }
+          console.warn(`[Agent] shell başlatılamadı (denendi: ${shell}): ${lastErr.message}`);
+        }
       }
+
+      socket.emit("term-output", {
+        termId,
+        data: `\r\n\x1b[31mShell hatası: ${lastErr ? lastErr.message : "uygun kabuk bulunamadı"}\x1b[0m\r\n`,
+      });
     });
 
     socket.on("term-input", ({ termId, data }) => {
