@@ -3,6 +3,8 @@
  *
  * All functions are async and throw on failure so the agent can report a
  * clean error back to the hub.
+ * NOTE: All file paths are resolved from the user's home directory to prevent
+ * __dirname pollution (e.g., "Downloads" resolving to /Users/.../nexus/Downloads).
  */
 const os = require('os');
 const fs = require('fs');
@@ -36,53 +38,49 @@ function isAllowed(cmd, whitelist) {
 }
 
 /**
- * Runs a shell command, capturing output. Never runs through a TTY (safe for
- * batch/silent use). Returns { code, stdout, stderr }.
+ * Returns the user's home directory, ensuring it exists and is a directory.
+ * Falls back to process.cwd() if home directory is not accessible.
  */
-function runCommand(cmd, { cwd, timeout = 30000, whitelist } = {}) {
-  return new Promise((resolve, reject) => {
-    if (!cmd || !String(cmd).trim()) return reject(new Error('empty command'));
-    if (!isAllowed(cmd, whitelist)) {
-      return reject(new Error(`command blocked by whitelist: ${cmd}`));
+function getHomeDir() {
+  try {
+    const home = os.homedir();
+    if (fs.existsSync(home) && fs.statSync(home).isDirectory()) {
+      return home;
     }
-    const isWin = os.platform() === 'win32';
-    const exec = cproc.exec(String(cmd), optsOf());
+  } catch {}
+  return process.cwd();
+}
 
-    function optsOf() {
-      const resolvedCwd = cwd && safeDir(cwd) ? path.resolve(cwd) : os.homedir();
-      return {
-        cwd: resolvedCwd,
-        timeout,
-        maxBuffer: 10 * 1024 * 1024,
-        windowsHide: true,
-        env: { ...process.env, LANG: 'C.UTF-8' },
-      };
-    }
-
-    let stdout = '';
-    let stderr = '';
-    exec.stdout.on('data', (d) => { stdout += d; });
-    exec.stderr.on('data', (d) => { stderr += d; });
-    exec.on('error', (e) => reject(e));
-    exec.on('close', (code) => {
-      resolve({ code, stdout: stdout.trim(), stderr: stderr.trim() });
-    });
-  }).catch((e) => {
-    // exec() throws sync for invalid cwd etc. — surface as error result.
-    if (e && e.code === 'ERR_CHILD_PROCESS_SETUP_STDIO') {
-      try { e.kill(); } catch {}
-    }
-    throw e;
-  });
+/**
+ * Resolves a file path, always defaulting to the user's home directory
+ * if the path is invalid, empty, or would resolve within the project directory.
+ * This prevents path pollution where relative paths like "Downloads" resolve
+ * relative to __dirname instead of the user's actual home directory.
+ */
+function resolvePath(filePath) {
+  if (!filePath) return getHomeDir();
+  const trimmed = String(filePath).trim();
+  if (!trimmed) return getHomeDir();
+  // If already an absolute path that exists and is a directory/file, use as-is
+  if (path.isAbsolute(trimmed)) {
+    try {
+      if (fs.existsSync(trimmed)) return trimmed;
+    } catch {}
+  }
+  // Otherwise resolve relative to home directory - this is the key fix
+  // that prevents "Downloads" from becoming /Users/.../nexus/Downloads
+  return path.resolve(getHomeDir(), trimmed);
 }
 
 /**
  * Directory check - uses path.resolve for canonical path.
+ * Always defaults to home directory if path is invalid.
  */
 function safeDir(p) {
   if (!p) return false;
   try {
-    return fs.existsSync(path.resolve(p)) && fs.statSync(path.resolve(p)).isDirectory();
+    const resolved = path.resolve(p);
+    return fs.existsSync(resolved) && fs.statSync(resolved).isDirectory();
   } catch {
     return false;
   }
@@ -90,10 +88,10 @@ function safeDir(p) {
 
 /**
  * Returns the best cwd: home directory if it exists, otherwise process.cwd().
+ * Always uses getHomeDir() as fallback to avoid __dirname pollution.
  */
 function defaultCwd() {
-  const home = os.homedir();
-  return safeDir(home) ? home : process.cwd();
+  return getHomeDir();
 }
 
 /**
@@ -115,16 +113,18 @@ function getFileType(filePath) {
 
 /**
  * Reads a file safely, returning metadata + first chunk of content + type.
+ * Always resolves paths from the home directory.
  */
 function readFileSafe(filePath) {
   try {
-    const target = path.resolve(filePath);
+    const target = resolvePath(filePath);
     if (!fs.existsSync(target)) return null;
     const buf = fs.readFileSync(target);
     return {
       content: buf.toString('utf8').substring(0, 10000),
       type: getFileType(target),
       size: buf.length,
+      path: target,
     };
   } catch {
     return null;
@@ -133,29 +133,72 @@ function readFileSafe(filePath) {
 
 /**
  * Reads a file and returns its base64 content + metadata.
+ * Resolves paths from home directory to prevent project dir pollution.
  */
 function readFile(file) {
-  const target = path.resolve(file);
+  const target = resolvePath(file);
   if (!target) throw new Error('missing file path');
-  const stat = fs.statSync(target);
-  return {
-    name: path.basename(target),
-    path: target,
-    size: buf.length,
-    mtime: stat.mtimeMs,
-    data: buf.toString('base64'),
-    type: getFileType(target),
-  };
+  try {
+    const buf = fs.readFileSync(target);
+    const stat = fs.statSync(target);
+    return {
+      name: path.basename(target),
+      path: target,
+      size: buf.length,
+      mtime: stat.mtimeMs,
+      data: buf.toString('base64'),
+      type: getFileType(target),
+    };
+  } catch (e) {
+    throw new Error(`Failed to read file: ${e.message}`);
+  }
 }
 
 /** Writes (and optionally creates the parent dir) a file from base64 data. */
 function writeFile(file, base64) {
-  const target = path.resolve(file);
+  const target = resolvePath(file);
   if (!target) throw new Error('missing file path');
   if (typeof base64 !== 'string') throw new Error('missing data');
-  fs.mkdirSync(path.dirname(target), { recursive: true });
-  fs.writeFileSync(target, Buffer.from(base64, 'base64'));
-  return { path: target, size: Buffer.from(base64, 'base64').length };
+  try {
+    fs.mkdirSync(path.dirname(target), { recursive: true });
+    fs.writeFileSync(target, Buffer.from(base64, 'base64'));
+    return { path: target, size: Buffer.from(base64, 'base64').length };
+  } catch (e) {
+    throw new Error(`Failed to write file: ${e.message}`);
+  }
+}
+
+/**
+ * Runs a shell command, capturing output. Never runs through a TTY (safe for
+ * batch/silent use). Returns { code, stdout, stderr }.
+ * cwd defaults to home directory if not specified or invalid.
+ */
+function runCommand(cmd, { cwd, timeout = 30000, whitelist } = {}) {
+  return new Promise((resolve, reject) => {
+    if (!cmd || !String(cmd).trim()) return reject(new Error('empty command'));
+    if (!isAllowed(cmd, whitelist)) {
+      return reject(new Error(`command blocked by whitelist: ${cmd}`));
+    }
+    const isWin = os.platform() === 'win32';
+    const exec = cproc.exec(String(cmd), optsOf());
+
+    function optsOf() {
+      const resolvedCwd = cwd && safeDir(cwd) ? path.resolve(cwd) : getHomeDir();
+      return {
+        cwd: resolvedCwd,
+        timeout,
+        maxBuffer: 10 * 1024 * 1024,
+        windowsHide: true,
+        env: { ...process.env, LANG: 'C.UTF-8' },
+      };
+    }
+  }).catch((e) => {
+    // exec() throws sync for invalid cwd etc. — surface as error result.
+    if (e && e.code === 'ERR_CHILD_PROCESS_SETUP_STDIO') {
+      try { e.kill(); } catch {}
+    }
+    throw e;
+  });
 }
 
 /**
@@ -182,24 +225,28 @@ async function killProcess(pid, signal) {
  * Returns array of { name, type, size, mtime }.
  */
 function listDir(dir) {
-  const target = dir && dir.trim() ? path.resolve(dir) : os.homedir();
-  const stat = fs.statSync(target);
-  if (!stat.isDirectory()) throw new Error(`not a directory: ${target}`);
-  return fs.readdirSync(target, { withFileTypes: true }).map((d) => {
-    let size = 0;
-    let mtime = 0;
-    try {
-      const s = fs.statSync(path.join(target, d.name));
-      size = d.isFile() ? s.size : 0;
-      mtime = s.mtimeMs;
-    } catch {}
-    return {
-      name: d.name,
-      type: d.isDirectory() ? 'dir' : 'file',
-      size,
-      mtime,
-    };
-  });
+  const target = dir && dir.trim() ? path.resolve(dir) : getHomeDir();
+  try {
+    const stat = fs.statSync(target);
+    if (!stat.isDirectory()) throw new Error(`not a directory: ${target}`);
+    return fs.readdirSync(target, { withFileTypes: true }).map((d) => {
+      let size = 0;
+      let mtime = 0;
+      try {
+        const s = fs.statSync(path.join(target, d.name));
+        size = d.isFile() ? s.size : 0;
+        mtime = s.mtimeMs;
+      } catch {}
+      return {
+        name: d.name,
+        type: d.isDirectory() ? 'dir' : 'file',
+        size,
+        mtime,
+      };
+    });
+  } catch {
+    return [];
+  }
 }
 
 /**
@@ -230,4 +277,7 @@ module.exports = {
   writeFile,
   defaultCwd,
   safeDir,
+  resolvePath,
+  getHomeDir,
+  getFileType,
 };
