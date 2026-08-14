@@ -9,7 +9,9 @@
     "agent": "node index.js --mode agent --hub http://localhost:8888",
     "gen-icons": "node scripts/gen-icons.js",
     "install:service": "node index.js --install",
-    "uninstall:service": "node index.js --uninstall"
+    "uninstall:service": "node index.js --uninstall",
+    "poll:update": "node poll-updates.js --repo . --interval 30",
+    "poll:update:once": "node poll-updates.js --repo . --once"
   },
   "dependencies": {
     "@xterm/addon-fit": "^0.11.0",

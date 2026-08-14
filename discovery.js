@@ -24,9 +24,13 @@ function lanInterfaces() {
   return list;
 }
 
+function lanIPs() {
+  return lanInterfaces().map((i) => i.address);
+}
+
 function lanIP() {
-  const ifaces = lanInterfaces();
-  return ifaces.length ? ifaces[0].address : "127.0.0.1";
+  const ips = lanIPs();
+  return ips.length ? ips[0] : "127.0.0.1";
 }
 
 function localPeerIds() {
@@ -178,4 +182,7 @@ module.exports = {
   startScanner,
   trackPeers,
   lanIP,
+  lanIPs,
+  lanInterfaces,
+  isOwnPeer,
 };

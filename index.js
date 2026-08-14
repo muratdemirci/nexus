@@ -6,7 +6,7 @@ const path = require('path');
 
 function parseArgs() {
   const a = process.argv.slice(2);
-  const p = { mode: 'both', port: 8888, hub: 'http://localhost:8888', name: os.hostname(), interval: 1000, repoDir: path.resolve(__dirname), updateBranch: 'main', updateInterval: 60, discover: true, firewall: true };
+  const p = { mode: 'both', port: 8888, hub: 'http://localhost:8888', name: os.hostname(), interval: 1000, repoDir: path.resolve(__dirname), updateBranch: '', updateInterval: 60, discover: true, firewall: true };
   for (let i = 0; i < a.length; i++) {
     switch (a[i]) {
       case '--mode': case '-m': p.mode = a[++i]; break;
@@ -29,6 +29,9 @@ function parseArgs() {
 
 const cfg = parseArgs();
 
+// Long-running server: never let a stray rejection kill the process.
+process.on('unhandledRejection', (e) => console.error('[Nexus] unhandled rejection:', e && e.message || e));
+
 // Service install/uninstall short-circuits everything else.
 if (process.argv.includes('--install') || process.argv.includes('--uninstall')) {
   const { installService, uninstallService } = require('./svc');
@@ -38,7 +41,7 @@ if (process.argv.includes('--install') || process.argv.includes('--uninstall')) 
   process.exit(r.ok ? 0 : 1);
 }
 
-  console.log(`\n  NEXUS  —  mode: ${cfg.mode.toUpperCase()}\n  ${cfg.mode !== 'agent' ? `hub: http://localhost:${cfg.port}` : `agent -> ${cfg.hub} (${cfg.name})`} | discovery: ${cfg.discover ? 'LAN on' : 'off'}\n`);
+console.log(`\n  NEXUS  —  mode: ${cfg.mode.toUpperCase()}\n  ${cfg.mode !== 'agent' ? `hub: http://localhost:${cfg.port}` : `agent -> ${cfg.hub} (${cfg.name})`} | discovery: ${cfg.discover ? 'LAN on' : 'off'}\n`);
 
 // OS-aware firewall check/setup (auto at startup unless --no-firewall).
 if (cfg.firewall) {

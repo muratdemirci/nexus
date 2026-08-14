@@ -6,19 +6,11 @@ const si = require("systeminformation");
 const dns = require("dns").promises;
 const pty = require("node-pty");
 const ex = require("./exec");
-const { git, restart } = require("./utils");
-const { startScanner } = require("./discovery");
+const { git, restart, loadConfig } = require("./utils");
+const { startScanner, lanIP, isOwnPeer } = require("./discovery");
 
 function gb(bytes) {
   return +(bytes / 1073741824).toFixed(1);
-}
-
-function loadConfig() {
-  try {
-    return JSON.parse(fs.readFileSync(path.join(__dirname, "config.json"), "utf8"));
-  } catch {
-    return {};
-  }
 }
 
 let agentConfig = loadConfig();
@@ -82,13 +74,7 @@ function startAgent(
   const sockets = new Map();
 
   // Collect ALL static info first, THEN connect (avoid race with handshake)
-  const ip = (() => {
-    for (const ifaces of Object.values(os.networkInterfaces())) {
-      for (const i of ifaces)
-        if (!i.internal && i.family === "IPv4") return i.address;
-    }
-    return "";
-  })();
+  const ip = lanIP();
 
   function hubKeyOf(url) {
     const u = new URL(url);
@@ -141,6 +127,7 @@ function startAgent(
         const seen = new Map();
         startScanner((peer) => {
           if (peer.role !== "hub") return;
+          if (isOwnPeer(peer)) return; // avoid a 2nd socket to this machine's own hub
           seen.set(peer.id, peer);
           const url = `http://${peer.ip}:${peer.port}`;
           if (!sockets.has(hubKeyOf(url))) connectTo(url, staticInfo);
@@ -181,6 +168,8 @@ function startAgent(
     socket.on("connect", () => {
       console.log(`[Agent] Hub: ${socket.id} @ ${url}`);
       socket.emit("hello", { hostname });
+      prevNet = null; // stale counters from before a disconnect must not skew the first report
+      netOnline = false;
       timer = setInterval(() => report(socket), intervalMs);
       netTimer = setInterval(() => checkInternet(socket), 10000);
       checkInternet(socket); // immediate first check
@@ -207,17 +196,17 @@ function startAgent(
     // Periodic stats including network throughput
     async function report(socket) {
       try {
-        const [cpuLoad, mem, fs, net] = await Promise.all([
+        const [cpuLoad, mem, fsSize, net] = await Promise.all([
           si.currentLoad(),
           si.mem(),
           si.fsSize(),
           si.networkStats(),
         ]);
         const disk =
-          fs.find((d) =>
+          fsSize.find((d) =>
             ["/", "C:", "/System/Volumes/Data"].includes(d.mount),
           ) ||
-          fs[0] ||
+          fsSize[0] ||
           {};
 
         let netRx = 0,
@@ -285,8 +274,6 @@ function startAgent(
 
     // ===== Terminal (real PTY via node-pty) =====
     function getTerminalShells() {
-      const fs = require("fs");
-      const path = require("path");
       const platform = os.platform();
 
       const exists = (candidate) => {
@@ -295,17 +282,6 @@ function startAgent(
           const ok =
             fs.existsSync(candidate) && fs.statSync(candidate).isFile();
           if (!ok) return false;
-          fs.accessSync(candidate, fs.constants.X_OK);
-          return true;
-        } catch {
-          return false;
-        }
-      };
-
-      const exec = (candidate) => {
-        if (!exists(candidate)) return false;
-        if (platform === "win32") return true;
-        try {
           fs.accessSync(candidate, fs.constants.X_OK);
           return true;
         } catch {
@@ -331,7 +307,6 @@ function startAgent(
           if (c && !candidates.includes(c)) candidates.push(c);
         }
       };
-      const pick = (test) => candidates.filter(test);
 
       if (platform === "win32") {
         const home = process.env.USERPROFILE || process.env.HOME || "C:\\";
@@ -349,7 +324,7 @@ function startAgent(
           "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
           "C:\\Program Files\\PowerShell\\7\\pwsh.exe",
         ]);
-        const shells = pick(exists);
+        const shells = candidates.filter(exists);
         if (!shells.length) shells.push("C:\\Windows\\System32\\cmd.exe");
         return { shells, argsOf };
       }
@@ -380,13 +355,12 @@ function startAgent(
               "/usr/local/bin/zsh",
             ];
       add(unixPool);
-      const shells = pick(exec);
+      const shells = candidates.filter(exists);
       if (!shells.length) shells.push("/bin/sh");
       return { shells, argsOf };
     }
 
     socket.on("term-init", ({ termId, cols, rows }) => {
-      const fs = require("fs");
       const { shells: shellList, argsOf } = getTerminalShells();
       const home = os.homedir();
       const cwd =

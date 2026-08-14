@@ -94,7 +94,7 @@
   .btn:disabled { opacity:.5; cursor:not-allowed; }
   .chips { display:flex; flex-wrap:wrap; gap:6px; margin:8px 0; }
   .chip { display:flex; align-items:center; gap:6px; background:var(--bg); border:1px solid var(--border); padding:4px 10px; border-radius:14px; font-size:12px; cursor:pointer; }
-  .chip.checked { border-color:var(--accent); color:var(--accent); }
+  .chip.checked, .chip:has(input:checked) { border-color:var(--accent); color:var(--accent); }
   .result-block { background:var(--bg); border:1px solid var(--border); border-radius:6px; padding:10px 12px; margin-bottom:8px; font-family:monospace; font-size:12px; white-space:pre-wrap; max-height:180px; overflow:auto; }
   .result-block .head { color:var(--accent); margin-bottom:4px; }
   .result-block.code-0 .head { color:var(--green); }
@@ -611,7 +611,10 @@ socket.on('stats-update', updateAgentStats);
 socket.on('history-update', renderHistory);
 socket.on('alert', ({ hostname, metric, value, limit }) => {
   const ic = metric.toUpperCase().replace('_', ' ');
-  logEntry('ALERT', `${hostname}: ${ic} ${metric === 'offline' || metric === 'online' ? '' : value + '%'} (threshold %' + limit + ')`, metric === 'online' ? '' : 'warn');
+  const isStatus = metric === 'offline' || metric === 'online';
+  const val = isStatus ? '' : value + '%';
+  const suffix = isStatus ? '' : ` (threshold ${limit}%)`;
+  logEntry('ALERT', `${hostname}: ${ic} ${val}${suffix}`, isStatus ? '' : 'warn');
 });
 socket.on('repo-info', (i) => {
   commitText.textContent = i.commit ? `${i.branch||''}@${i.commit}` : 'no git';

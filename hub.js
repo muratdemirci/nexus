@@ -5,21 +5,14 @@ const path = require('path');
 const os = require('os');
 const { Server } = require('socket.io');
 const QRCode = require('qrcode');
-const { git, restart } = require('./utils');
-const { startBeacon, trackPeers, lanIP } = require('./discovery');
+const { git, restart, loadConfig } = require('./utils');
+const { startBeacon, trackPeers, lanIPs } = require('./discovery');
 const { notify } = require('./notify');
-
-function loadConfig() {
-  try {
-    return JSON.parse(fs.readFileSync(path.join(__dirname, 'config.json'), 'utf8'));
-  } catch {
-    return {};
-  }
-}
 
 function startHub(port = 8888, opts = {}) {
   const repoDir = opts.repoDir || __dirname;
-  const branch = opts.updateBranch || 'main';
+  // '' = auto-detect the repo's current branch (avoids branch name mismatch)
+  const branch = opts.updateBranch || '';
   const pollSec = opts.updateInterval || 60;
   const name = opts.name || os.hostname();
   const discover = opts.discover !== false;
@@ -42,6 +35,11 @@ function startHub(port = 8888, opts = {}) {
   let cfg = { ...loadConfig() };
   let info = { branch: null, commit: null, remote: null, update: false };
   let busy = false;
+
+  async function effectiveBranch() {
+    if (branch) return branch;
+    return (await git.branch(repoDir)) || 'main';
+  }
 
   function saveConfig(next) {
     cfg = { ...loadConfig(), ...next };
@@ -110,19 +108,17 @@ function startHub(port = 8888, opts = {}) {
 
   app.use(express.json());
 
-  app.post('/webhook', (req, res) => {
-    if (req.body && req.body.ref === `refs/heads/${branch}`) broadcastUpdate();
+  app.post('/webhook', async (req, res) => {
+    const eff = await effectiveBranch();
+    if (req.body && req.body.ref === `refs/heads/${eff}`) broadcastUpdate();
     res.json({ ok: true });
   });
   app.get('/api/agents', (req, res) => res.json([...agents.values()]));
   app.get('/api/network', (req, res) => res.json(network.all));
 
   app.get('/api/hostinfo', (req, res) => {
-    const ips = [];
-    for (const ifaces of Object.values(os.networkInterfaces())) {
-      for (const i of ifaces) if (!i.internal && i.family === 'IPv4') ips.push(i.address);
-    }
-    const host = cfg.qrHost || ips[0] || lanIP() || 'localhost';
+    const ips = lanIPs();
+    const host = cfg.qrHost || ips[0] || 'localhost';
     const ts = ips.find((ip) => ip.startsWith('100.')) || '';
     res.json({ host, url: `http://${host}:${port}`, lanIPs: ips, tailscaleIP: ts, hostname: os.hostname() });
   });
@@ -243,7 +239,7 @@ function startHub(port = 8888, opts = {}) {
   }
 
   // ---------- LAN discovery ----------
-  let network = { all: () => [] };
+  let network = { get all() { return []; } };
   let beacon = null;
   if (discover) {
     const peers = trackPeers(({ type, peer }) => {
@@ -255,10 +251,11 @@ function startHub(port = 8888, opts = {}) {
 
   // ---------- Git auto-update ----------
   async function refresh(silent = false) {
-    info.branch = (await git.branch(repoDir)) || info.branch;
+    const eff = await effectiveBranch();
+    info.branch = eff;
     info.commit = (await git.commit(repoDir)) || info.commit;
     await git.fetch(repoDir);
-    info.remote = (await git.remote(repoDir, branch)) || info.remote;
+    info.remote = (await git.remote(repoDir, eff)) || info.remote;
     info.update = !!(info.remote && info.commit && info.remote !== info.commit);
     io.emit('repo-info', info);
     if (!silent) console.log(info.update ? `[Hub] update available: ${info.commit} -> ${info.remote}` : `[Hub] up to date (${info.commit})`);
@@ -268,13 +265,14 @@ function startHub(port = 8888, opts = {}) {
   async function broadcastUpdate() {
     if (busy) return;
     busy = true;
+    const eff = await effectiveBranch();
     const has = await refresh(true);
     io.emit('update-status', { from: 'Hub', stage: 'start', msg: has ? `Update (${info.commit} -> ${info.remote})` : 'Verifying.' });
-    io.emit('update-command', { branch, repoDir });
+    io.emit('update-command', { branch: eff, repoDir });
     if (has) {
       try {
         io.emit('update-status', { from: 'Hub', stage: 'pull', msg: 'Hub pull...' });
-        await git.pull(repoDir, branch);
+        await git.pull(repoDir, eff);
         io.emit('update-status', { from: 'Hub', stage: 'install', msg: 'Hub npm install...' });
         await git.install(repoDir);
         io.emit('update-status', { from: 'Hub', stage: 'restart', msg: 'Hub restarting...' });
@@ -357,6 +355,10 @@ function startHub(port = 8888, opts = {}) {
       socket.on('disconnect', () => {
         agents.delete(socket.id);
         io.emit('agent-list', [...agents.values()]);
+        // drop terminal sessions this agent hosted so /api/logs stays clean
+        for (const [termId, ts] of terms.entries()) {
+          if (ts.agentSocketId === socket.id) terms.delete(termId);
+        }
         const st = deviceStates.get(a.hostname);
         if (st) {
           const offSec = (cfg.thresholds || {}).offline || 60;
@@ -434,7 +436,7 @@ function startHub(port = 8888, opts = {}) {
   setInterval(() => { if (!busy) refresh(true).then((u) => { if (u) broadcastUpdate(); }).catch(() => {}); }, pollSec * 1000);
   refresh();
 
-  server.listen(port, '0.0.0.0', () => console.log(`[Hub] http://localhost:${port} | poll: ${pollSec}s | branch: ${branch}`));
+  server.listen(port, '0.0.0.0', () => console.log(`[Hub] http://localhost:${port} | poll: ${pollSec}s | branch: ${branch || 'auto'}`));
 }
 
 module.exports = { startHub };
