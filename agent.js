@@ -63,7 +63,7 @@ function ensurePtyNative() {
       } catch {}
     }
   }
-  if (touched) console.log(`[Agent] node-pty native yardımcı düzeltildi (${touched} dosya)`);
+  if (touched) console.log(`[Agent] node-pty native helper fixed (${touched} file(s))`);
   return touched > 0;
 }
 
@@ -102,7 +102,7 @@ function startAgent(
   function connectTo(url, staticInfo) {
     const key = hubKeyOf(url);
     if (sockets.has(key)) return;
-    console.log(`[Agent] hub hedefi: ${url}`);
+    console.log(`[Agent] hub target: ${url}`);
     const socket = startSocket(url, staticInfo);
     sockets.set(key, { url, socket });
   }
@@ -110,7 +110,7 @@ function startAgent(
   function dropHub(key) {
     const entry = sockets.get(key);
     if (!entry) return;
-    console.log(`[Agent] hub kayboldu, bağlantı kapatıldı: ${entry.url}`);
+    console.log(`[Agent] hub lost, connection closed: ${entry.url}`);
     try {
       entry.socket.close();
     } catch {}
@@ -201,7 +201,7 @@ function startAgent(
         } catch {}
       }
       shells.clear();
-      console.log("[Agent] bağlantı koptu, tekrar deneniyor...");
+      console.log("[Agent] connection lost, retrying...");
     });
 
     // Periodic stats including network throughput
@@ -439,13 +439,13 @@ function startAgent(
               lastErr = e2;
             }
           }
-          console.warn(`[Agent] shell başlatılamadı (denendi: ${shell}): ${lastErr.message}`);
+          console.warn(`[Agent] shell could not start (tried: ${shell}): ${lastErr.message}`);
         }
       }
 
       socket.emit("term-output", {
         termId,
-        data: `\r\n\x1b[31mShell hatası: ${lastErr ? lastErr.message : "uygun kabuk bulunamadı"}\x1b[0m\r\n`,
+        data: `\r\n\x1b[31mShell error: ${lastErr ? lastErr.message : "no usable shell found"}\x1b[0m\r\n`,
       });
     });
 
@@ -480,7 +480,7 @@ function startAgent(
     // ===== Remote ops (command, processes, files, restart) =====
     socket.on("op", async ({ opId, op, payload = {} }) => {
       const fail = (err) => {
-        console.warn(`[Agent] op ${op} başarısız: ${err && err.message}`);
+        console.warn(`[Agent] op ${op} failed: ${err && err.message}`);
         socket.emit("op-result", { opId, ok: false, error: err && err.message });
       };
       try {
@@ -549,7 +549,7 @@ function startAgent(
         if (!rem || cur === rem) {
           socket.emit("update-status", {
             stage: "uptodate",
-            msg: `güncel (${cur})`,
+            msg: `up to date (${cur})`,
           });
           return;
         }
@@ -565,7 +565,7 @@ function startAgent(
         await git.install(repoDir);
         socket.emit("update-status", {
           stage: "restart",
-          msg: "yeniden başlatılıyor...",
+          msg: "restarting...",
         });
         restart(process.argv.slice(2));
       } catch (e) {

@@ -41,9 +41,9 @@ function isAllowed(cmd, whitelist) {
  */
 function runCommand(cmd, { cwd, timeout = 30000, whitelist } = {}) {
   return new Promise((resolve, reject) => {
-    if (!cmd || !String(cmd).trim()) return reject(new Error('komut boş'));
+    if (!cmd || !String(cmd).trim()) return reject(new Error('empty command'));
     if (!isAllowed(cmd, whitelist)) {
-      return reject(new Error(`komut whitelist tarafından engellendi: ${cmd}`));
+      return reject(new Error(`command blocked by whitelist: ${cmd}`));
     }
     const isWin = os.platform() === 'win32';
     const exec = cproc.exec(String(cmd), optsOf());
@@ -104,7 +104,7 @@ async function listProcesses() {
  * Kills a process by pid. Windows uses taskkill, unix uses process.kill.
  */
 async function killProcess(pid, signal) {
-  if (!pid || typeof pid !== 'number') throw new Error('pid eksik');
+  if (!pid || typeof pid !== 'number') throw new Error('pid missing');
   if (os.platform() === 'win32') {
     const r = cproc.execFileSync('taskkill', ['/PID', String(pid), '/T', '/F'], { windowsHide: true, stdio: 'pipe' });
     return true;
@@ -112,7 +112,7 @@ async function killProcess(pid, signal) {
   try {
     process.kill(pid, signal || 'SIGTERM');
   } catch (e) {
-    if (e.code === 'ESRCH') throw new Error(`işlem yok: ${pid}`);
+    if (e.code === 'ESRCH') throw new Error(`no such process: ${pid}`);
     throw e;
   }
   return true;
@@ -125,7 +125,7 @@ async function killProcess(pid, signal) {
 function listDir(dir) {
   const target = dir && dir.trim() ? path.resolve(dir) : os.homedir();
   const stat = fs.statSync(target);
-  if (!stat.isDirectory()) throw new Error(`dizin değil: ${target}`);
+  if (!stat.isDirectory()) throw new Error(`not a directory: ${target}`);
   return fs.readdirSync(target, { withFileTypes: true }).map((d) => {
     let size = 0;
     let mtime = 0;
@@ -146,7 +146,7 @@ function listDir(dir) {
 /** Reads a file and returns its utf8-safe base64 content + metadata. */
 function readFile(file) {
   const target = file && file.trim() ? path.resolve(file) : null;
-  if (!target) throw new Error('dosya yolu eksik');
+  if (!target) throw new Error('missing file path');
   const buf = fs.readFileSync(target);
   const stat = fs.statSync(target);
   return {
@@ -161,8 +161,8 @@ function readFile(file) {
 /** Writes (and optionally creates the parent dir) a file from base64 data. */
 function writeFile(file, base64) {
   const target = file && file.trim() ? path.resolve(file) : null;
-  if (!target) throw new Error('dosya yolu eksik');
-  if (typeof base64 !== 'string') throw new Error('veri eksik');
+  if (!target) throw new Error('missing file path');
+  if (typeof base64 !== 'string') throw new Error('missing data');
   fs.mkdirSync(path.dirname(target), { recursive: true });
   fs.writeFileSync(target, Buffer.from(base64, 'base64'));
   return { path: target, size: Buffer.from(base64, 'base64').length };

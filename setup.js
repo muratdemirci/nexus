@@ -43,9 +43,9 @@ function macAllowNode() {
 
 function linuxHint() {
   return [
-    'Linux: geçerli kurallar için yönetici:',
-    `  sudo ufw allow ${port}/tcp   # hub web arayüzü`,
-    `  sudo ufw allow ${dport}/udp  # LAN keşif`,
+    'Linux: run as root to apply rules:',
+    `  sudo ufw allow ${port}/tcp   # hub web UI`,
+    `  sudo ufw allow ${dport}/udp  # LAN discovery`,
   ];
 }
 
@@ -66,7 +66,7 @@ async function checkFirewall() {
     }
     applied = rules[hubRule].ok && rules[discRule].ok;
   } else if (platform === 'darwin') {
-    rules['node (socketfilterfw)'] = { ok: true, note: 'uygulama bazlı izin' };
+    rules['node (socketfilterfw)'] = { ok: true, note: 'per-app permission' };
     applied = true;
   } else if (platform === 'linux') {
     const r = await execNet('iptables', ['-L', 'INPUT', '-n']);
@@ -91,7 +91,7 @@ async function ensureFirewall() {
       return {
         mode: 'hint',
         lines: [
-          'Firewall kurallarını kontrol edemedim — yönetici yetkisi yok. Bu komutları yönetici olarak çalıştırın:',
+          'Could not check firewall rules — no admin rights. Run these commands as admin:',
           `  netsh advfirewall firewall add rule name="${hubRule}" dir=in action=allow protocol=TCP localport=${port}`,
           `  netsh advfirewall firewall add rule name="${discRule}" dir=in action=allow protocol=UDP localport=${dport}`,
         ],
@@ -102,7 +102,7 @@ async function ensureFirewall() {
       const present = !show.err && /Enabled:\s+Yes/i.test(show.out);
       if (!present) await netshWin(['add', 'rule', 'name=' + rw, 'dir=in', 'action=allow', 'protocol=' + proto, 'localport=' + port]);
     }
-    return { mode: 'ok', lines: [`Windows: ${hubRule} + ${discRule} hazır (TCP ${port}, UDP ${dport}).`] };
+    return { mode: 'ok', lines: [`Windows: ${hubRule} + ${discRule} ready (TCP ${port}, UDP ${dport}).`] };
   }
 
   if (platform === 'darwin') {
@@ -110,8 +110,8 @@ async function ensureFirewall() {
     return {
       mode: ok ? 'ok' : 'hint',
       lines: ok
-        ? ['macOS: Application Firewall node için izinli.']
-        : ['macOS: izin ayarlanamadı → Sistem Ayarları → Gizlilik & Güvenlik → Firewall → node gelen bağlantılara izin ver.'],
+        ? ['macOS: Application Firewall allows node.']
+        : ['macOS: could not set permission → System Settings → Privacy & Security → Firewall → allow node to accept incoming connections.'],
     };
   }
 
@@ -119,7 +119,7 @@ async function ensureFirewall() {
     return { mode: 'hint', lines: linuxHint() };
   }
 
-  return { mode: 'hint', lines: [`Bilinmeyen OS (${platform}) — kuralları elle ayarlayın.`] };
+  return { mode: 'hint', lines: [`Unknown OS (${platform}) — set rules manually.`] };
 }
 
 module.exports = { ensureFirewall, checkFirewall, isAdminWindows, port, dport, hubRule, discRule };

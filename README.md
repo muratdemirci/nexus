@@ -1,29 +1,29 @@
 # Nexus
 
-Nexus, hub ve agent yapısına sahip bir cihaz yönetim ve uzaktan terminal sistemidir. Ana sunucu (hub), bağlı cihazları listeler, durum bilgilerini gösterir; terminal erişimi, dosya gezgini, proses yönetimi, toplu komut, alarm bildirimi ve otomatik güncelleme sağlar.
+Nexus is a device management and remote terminal system built on a hub + agent architecture. The central server (hub) lists connected devices and shows their status; it provides terminal access, a file explorer, process manager, batch commands, alert notifications, and automatic updates.
 
-## Özellikler
+## Features
 
-- **Gerçek zamanlı izleme** — CPU, RAM, disk, ağ, çalışma süresi (her agent `systeminformation` ile)
-- **Uzaktan terminal** — her cihazda gerçek PTY (`node-pty`); oturum kaydı tutulur
-- **Dosya gezgini** — klasör gezme, dosya yükleme/indirme
-- **Proses yöneticisi** — canlı liste + kill
-- **Toplu komut** — seçilen/ağdaki tüm cihazlarda aynı anda komut çalıştırma
-- **Komut whitelist** — `config.json` ile izin verilen komutlar dışındakiler engellenir
-- **Alarm / eşik bildirimleri** — CPU/RAM/disk eşikleri + çevrimdışı algılama (Telegram + Discord)
-- **Mobil erişim** — PWA + QR kod
-- **Servis kurulumu** — systemd / launchd / Windows başlangıç (tek komut)
-- **Tek komut kurulum** — `install.sh` / `install.ps1`
-- **Otomatik güncelleme** — git push ile hub + tüm agent'lar güncellenir
-- **LAN keşif** — aynı subnet'teki tüm hub/agent'ları otomatik bulur (UDP 8889)
+- **Real-time monitoring** — CPU, RAM, disk, network, uptime (each agent uses `systeminformation`)
+- **Remote terminal** — real PTY on every device (`node-pty`); sessions are logged
+- **File explorer** — browse folders, upload/download files
+- **Process manager** — live list + kill
+- **Batch commands** — run a command on selected/all devices at once
+- **Command whitelist** — only allowed commands (via `config.json`) can run
+- **Alerts / threshold notifications** — CPU/RAM/disk thresholds + offline detection (Telegram + Discord)
+- **Mobile access** — PWA + QR code
+- **Service install** — systemd / launchd / Windows Startup (one command)
+- **One-command install** — `install.sh` / `install.ps1`
+- **Auto-update** — hub and all agents update on git push
+- **LAN discovery** — automatically finds every hub/agent on the same subnet (UDP 8889)
 
-## Gereksinimler
+## Requirements
 
-- Node.js 18+ (18.20 veya 20+ önerilir)
+- Node.js 18+ (18.20 or 20+ recommended)
 - npm
 - Git
 
-## Tek Komutla Kurulum
+## One-Command Install
 
 **Linux / macOS:**
 
@@ -31,138 +31,138 @@ Nexus, hub ve agent yapısına sahip bir cihaz yönetim ve uzaktan terminal sist
 curl -sSL https://raw.githubusercontent.com/muratdemirci/nexus/main/install.sh | bash
 ```
 
-**Windows (yönetici PowerShell):**
+**Windows (PowerShell as admin):**
 
 ```powershell
 Invoke-Expression (Invoke-RestMethod https://raw.githubusercontent.com/muratdemirci/nexus/main/install.ps1)
 ```
 
-Kurulum scriptleri: node/npm/git kontrolü, repoyu klonlar, bağımlılıkları kurar ve (istenirse) sisteme servis olarak kaydeder.
+The install scripts check for node/npm/git, clone the repo, install dependencies, and (optionally) register it as a service.
 
-## Manüel Kurulum
+## Manual Install
 
 ```bash
 cd nexus
 npm install
-npm run gen-icons   # PWA ikonları (ilk kurulumda)
+npm run gen-icons   # PWA icons (first install only)
 ```
 
-## Çalıştırma
+## Running
 
-### Aynı yerel ağdaki birden çok bilgisayarı bağlama (LAN keşfi)
+### Connecting multiple computers on the same LAN (discovery)
 
-Nexus, aynı subnet üzerindeki bilgisayarları UDP broadcast ile otomatik keşfeder
-(`discovery.js`, UDP port `8889`). Her makine hub beacon yayınlar, her agent
-LAN'daki **tüm** hub'ları bulup **hepsine** bağlanır. Yeni IP girmeye gerek
-yoktur; sadece `npm start` çalıştırın. Arayüzdeki **"AĞDAKİ CİHAZLAR"** paneli
-keşfedilen cihazları listeler.
+Nexus automatically discovers computers on the same subnet via UDP broadcast
+(`discovery.js`, UDP port `8889`). Every machine broadcasts a hub beacon, and
+every agent finds **all** hubs on the LAN and connects to **all of them**. No IP
+entering required — just run `npm start`. The **"DEVICES ON NETWORK"** panel in
+the UI lists discovered devices.
 
-> **Güvenlik duvarı (Windows):** Keşif (`UDP 8889`) ve web arayüzü (`TCP 8888`)
-> için gelen bağlantılara izin verin. `npm run install:service` firewall
-> kurallarını da eklemeye çalışır; yetki yoksa aşağıdakileri elle çalıştırın:
+> **Firewall (Windows):** allow incoming connections for discovery (`UDP 8889`)
+> and the web UI (`TCP 8888`). `npm run install:service` also tries to add
+> firewall rules; if you lack permissions, run these manually:
 >
 > ```bat
 > netsh advfirewall firewall add rule name="Nexus Hub 8888" dir=in action=allow protocol=TCP localport=8888
 > netsh advfirewall firewall add rule name="Nexus Discovery 8889" dir=in action=allow protocol=UDP localport=8889
 > ```
 
-### Hub (web arayüzü)
+### Hub (web UI)
 
 ```bash
-npm run hub        # veya: node index.js --mode hub
+npm run hub        # or: node index.js --mode hub
 # http://localhost:8888
 ```
 
 ### Agent
 
 ```bash
-npm run agent      # veya: node index.js --mode agent --hub http://localhost:8888
+npm run agent      # or: node index.js --mode agent --hub http://localhost:8888
 ```
 
-### Hub + Agent birlikte
+### Hub + Agent together
 
 ```bash
 npm start
 ```
 
-### Servis olarak kurma / kaldırma
+### Installing / removing as a service
 
-- Linux : `npm run install:service` (sudo ile) → systemd `nexus` servisi
-- macOS : `npm run install:service` → launchd `com.nexus` agent'ı
-- Windows: `npm run install:service` → başlangıç klasörüne kısayol
+- Linux : `npm run install:service` (with sudo) → systemd `nexus` service
+- macOS : `npm run install:service` → launchd `com.nexus` agent
+- Windows: `npm run install:service` → Startup folder shortcut
 
-Her üç platformda da kaldırma için: `npm run uninstall:service`
+To remove on all platforms: `npm run uninstall:service`
 
-## Özel ayarlar (`config.json`)
+## Custom settings (`config.json`)
 
 ```jsonc
 {
-  // Komut whitelist: Boş = her şey serbest. Dolu = sadece bu öneklerle
-  // başlayan komutlar (toplu komut özelliğinde) çalıştırılabilir.
+  // Command whitelist: empty = allow all. Non-empty = only commands
+  // starting with these prefixes can run (in the batch command feature).
   "whitelist": ["ls", "df", "ps", "free", "uptime", "ping", "ipconfig"],
   "thresholds": {
-    "cpu": 90,        // CPU % eşiği (aşılınca alarm)
+    "cpu": 90,        // CPU % threshold (alarm when exceeded)
     "ram": 90,        // RAM %
     "disk": 90,       // Disk %
-    "offline": 60     // çevrimdışı sayılmadan önce geçen saniye
+    "offline": 60     // seconds before a device is considered offline
   },
   "notify": {
     "telegram": { "token": "", "chatId": "" },
     "discord":  { "webhook": "" }
   },
-  "qrHost": "",       // QR/mobil erişim adresi (opsiyonel; boşsa LAN IP kullanılır)
-  "tailscale": true   // tailscale IP'sini arayüzde göster
+  "qrHost": "",       // QR/mobile access address (optional; defaults to LAN IP)
+  "tailscale": true   // show tailscale IP in the UI
 }
 ```
 
-Ayar eşikleri ve bildirimleri arayüzden de değiştirilebilir (**⚙ Ayarlar** butonu, `POST /api/config`).
+Thresholds and notification settings can also be changed from the UI (**⚙ Settings** button, `POST /api/config`).
 
-## CLI seçenekleri
+## CLI options
 
 ```bash
 node index.js --mode hub --port 8888
 node index.js --mode agent --hub http://192.168.1.10:8888 --name RaspberryPi
-node index.js --install      # servis olarak kur
-node index.js --uninstall    # servisi kaldır
-node index.js --no-discover  # LAN keşfi kapalı
-node index.js --no-firewall  # firewall işlemini atla
+node index.js --install      # install as a service
+node index.js --uninstall    # remove the service
+node index.js --no-discover  # disable LAN discovery
+node index.js --no-firewall  # skip firewall handling
 ```
 
-Tüm seçenekler: `--mode/-m`, `--port/-p`, `--hub/-H`, `--name/-n`,
+All options: `--mode/-m`, `--port/-p`, `--hub/-H`, `--name/-n`,
 `--interval/-i`, `--repo/-r`, `--update-branch/-b`, `--update-interval`,
 `--no-discover`, `--no-firewall`, `--install`, `--uninstall`.
 
-## REST API (otorize olmadan aynı LAN'da — dikkat: herkes kullanabilir)
+## REST API (no auth required on the same LAN — careful: anyone can use it)
 
-| Yöntem | Yol | Açıklama |
+| Method | Path | Description |
 | --- | --- | --- |
-| GET | `/api/agents` | bağlı agent listesi |
-| GET | `/api/network` | keşfedilen ağ cihazları |
-| POST | `/api/run` | `{agentIds[], command, cwd, timeout}` → toplu komut |
-| GET | `/api/processes/:agentId` | proses listesi |
+| GET | `/api/agents` | connected agent list |
+| GET | `/api/network` | discovered network devices |
+| POST | `/api/run` | `{agentIds[], command, cwd, timeout}` → batch command |
+| GET | `/api/processes/:agentId` | process list |
 | POST | `/api/kill` | `{agentId, pid}` |
-| GET | `/api/fs?agent=&path=` | dizin listesi |
-| GET | `/api/download?agent=&path=` | dosya indir |
-| POST | `/api/upload?agent=&path=` | dosya yükle (raw body) |
-| POST | `/api/restart/:agentId` | agent'ı yeniden başlat |
-| GET | `/api/history` | komut geçmişi |
-| GET | `/api/logs` / `/api/logs/:termId` | terminal oturum kayıtları |
-| GET | `/api/qr?host=` | mobil erişim QR (PNG) |
-| GET | `/api/hostinfo` | LAN/tailscale adresleri |
-| GET/POST | `/api/config` | ayarları oku/güncelle |
+| GET | `/api/fs?agent=&path=` | directory listing |
+| GET | `/api/download?agent=&path=` | download a file |
+| POST | `/api/upload?agent=&path=` | upload a file (raw body) |
+| POST | `/api/restart/:agentId` | restart an agent |
+| GET | `/api/history` | command history |
+| GET | `/api/logs` / `/api/logs/:termId` | terminal session logs |
+| GET | `/api/qr?host=` | mobile access QR (PNG) |
+| GET | `/api/hostinfo` | LAN/tailscale addresses |
+| GET/POST | `/api/config` | read/update settings |
 
-## Güvenlik notu
+## Security note
 
-Bu sürüm kimlik doğrulama / TLS içermez; yalnızca güvenilir, aynı LAN'daki
-ağlar ve tailscale benzeri VPN'ler için tasarlanmıştır. Komut whitelist'ini
-doldurmak, güvenilen ağların dışında en azından kötüye kullanım yüzeyini
-daraltır. İnternete açmadan önce mutlaka reverse proxy + kimlik doğrulama.
+This version has no authentication / TLS; it is intended only for trusted,
+same-LAN networks and tailscale-like VPNs. Filling in the command whitelist
+reduces the attack surface at least somewhat outside trusted networks. Before
+exposing it to the internet, always add a reverse proxy + authentication.
 
-## Sorun giderme
+## Troubleshooting
 
-1. Hub'un çalıştığından emin olun
-2. Agent'ın `--hub` adresini kontrol edin
-3. Port 8888 (TCP) ve 8889 (UDP) açık olduğundan emin olun
-4. Gerekirse `npm install` ve `npm run gen-icons`'ı tekrar çalıştırın
-5. macOS terminalinde `posix_spawnp failed` görürseniz `npm install`'ı tekrar
-   çalıştırın (agent başlangıçta native binary izinlerini kendisi de onarır)
+1. Make sure the hub is running
+2. Check the agent's `--hub` address
+3. Make sure ports 8888 (TCP) and 8889 (UDP) are open
+4. If needed, re-run `npm install` and `npm run gen-icons`
+5. If you see `posix_spawnp failed` in the macOS terminal, re-run `npm install`
+   (the agent also repairs native binary permissions itself at startup)

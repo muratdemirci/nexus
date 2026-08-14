@@ -61,7 +61,7 @@ function installService() {
       execFileSync('systemctl', ['daemon-reload'], { stdio: 'pipe' });
       execFileSync('systemctl', ['enable', 'nexus'], { stdio: 'pipe' });
       execFileSync('systemctl', ['start', 'nexus'], { stdio: 'pipe' });
-      return { ok: true, target: svc.target, msg: 'systemd servisi kuruldu ve başlatıldı. (systemctl status nexus)' };
+      return { ok: true, target: svc.target, msg: 'systemd service installed and started. (systemctl status nexus)' };
     }
     if (platform === 'darwin') {
       fs.mkdirSync(path.dirname(svc.target), { recursive: true });
@@ -73,14 +73,14 @@ function installService() {
     if (platform === 'win32') {
       fs.mkdirSync(path.dirname(svc.target), { recursive: true });
       fs.writeFileSync(svc.target, svc.content);
-      return { ok: true, target: svc.target, msg: 'Başlangıç klasörüne eklendi — oturum açınca otomatik çalışır.' };
+      return { ok: true, target: svc.target, msg: 'Added to Startup folder — runs automatically at login.' };
     }
   } catch (e) {
     return {
       ok: false,
       target: svc.target,
       error: e.message,
-      msg: 'Yönetici yetkisi gerekebilir. Servis dosyası hazır: ' + svc.target,
+      msg: 'Admin privileges may be required. Service file is ready at: ' + svc.target,
     };
   }
   return { ok: false, error: 'desteklenmeyen OS' };
@@ -101,7 +101,7 @@ function uninstallService() {
     } else if (platform === 'win32') {
       if (fs.existsSync(svc.target)) fs.unlinkSync(svc.target);
     }
-    return { ok: true, msg: 'Servis kaldırıldı.' };
+    return { ok: true, msg: 'Service removed.' };
   } catch (e) {
     return { ok: false, error: e.message };
   }

@@ -58,11 +58,11 @@ function startHub(port = 8888, opts = {}) {
   function callAgent(agentId, op, payload = {}, timeout = 20000) {
     return new Promise((resolve, reject) => {
       const ag = io.sockets.sockets.get(agentId);
-      if (!ag) return reject(new Error('agent çevrimdışı'));
+      if (!ag) return reject(new Error('agent offline'));
       const opId = 'op' + Date.now() + Math.random().toString(36).slice(2, 8);
       const timer = setTimeout(() => {
         pendingOps.delete(opId);
-        reject(new Error('zaman aşımı'));
+        reject(new Error('timeout'));
       }, timeout);
       pendingOps.set(opId, { resolve, reject, timer });
       ag.emit('op', { opId, op, payload });
@@ -78,9 +78,9 @@ function startHub(port = 8888, opts = {}) {
       const fired = !!st[metric];
       if (value >= limit && !fired) {
         st[metric] = true;
-        notify(cfg, [[metric.toUpperCase(), `${Math.round(value)}% (eşik %${limit})`], ['Cihaz', a.hostname]]);
+        notify(cfg, [[metric.toUpperCase(), `${Math.round(value)}% (threshold %${limit})`], ['Device', a.hostname]]);
         io.emit('alert', { agentId: a.id, hostname: a.hostname, metric, value, limit });
-        console.log(`[Hub] UYARI ${a.hostname} ${metric}=${value}% >= %${limit}`);
+        console.log(`[Hub] ALERT ${a.hostname} ${metric}=${value}% >= %${limit}`);
       } else if (value < limit && fired) {
         st[metric] = false;
       }
@@ -100,7 +100,7 @@ function startHub(port = 8888, opts = {}) {
   app.post('/api/upload', express.raw({ type: '*/*', limit: '500mb' }), async (req, res) => {
     const agent = req.query.agent;
     const p = req.query.path;
-    if (!agent || !p) return res.status(400).json({ error: 'agent/path eksik' });
+    if (!agent || !p) return res.status(400).json({ error: 'agent/path missing' });
     try {
       const data = req.body.toString('base64');
       const r = await callAgent(agent, 'fs-write', { path: p, data }, 120000);
@@ -147,11 +147,11 @@ function startHub(port = 8888, opts = {}) {
     const body = req.body || {};
     const agentIds = Array.isArray(body.agentIds) && body.agentIds.length ? body.agentIds : [...agents.keys()];
     const command = String(body.command || '').trim();
-    if (!command) return res.status(400).json({ error: 'komut boş' });
+    if (!command) return res.status(400).json({ error: 'empty command' });
     const results = {};
     for (const id of agentIds) {
       const ag = io.sockets.sockets.get(id);
-      if (!ag) { results[id] = { ok: false, error: 'çevrimdışı' }; continue; }
+      if (!ag) { results[id] = { ok: false, error: 'offline' }; continue; }
       try {
         const r = await callAgent(id, 'run', { command, cwd: body.cwd, timeout: body.timeout || 30000 }, (body.timeout || 30000) + 10000);
         results[id] = { ok: true, data: r };
@@ -173,7 +173,7 @@ function startHub(port = 8888, opts = {}) {
 
   app.post('/api/kill', async (req, res) => {
     const { agentId, pid } = req.body || {};
-    if (!pid) return res.status(400).json({ error: 'pid eksik' });
+    if (!pid) return res.status(400).json({ error: 'pid missing' });
     try { res.json(await callAgent(agentId, 'kill', { pid })); }
     catch (e) { res.status(500).json({ error: e.message }); }
   });
@@ -181,7 +181,7 @@ function startHub(port = 8888, opts = {}) {
   app.get('/api/fs', async (req, res) => {
     const agent = req.query.agent;
     const p = req.query.path || '';
-    if (!agent) return res.status(400).json({ error: 'agent eksik' });
+    if (!agent) return res.status(400).json({ error: 'agent missing' });
     try {
       const items = await callAgent(agent, 'fs-list', { path: p });
       res.json({ path: p, items });
@@ -190,7 +190,7 @@ function startHub(port = 8888, opts = {}) {
 
   app.get('/api/download', async (req, res) => {
     const { agent, path: p } = req.query;
-    if (!agent || !p) return res.status(400).json({ error: 'agent/path eksik' });
+    if (!agent || !p) return res.status(400).json({ error: 'agent/path missing' });
     try {
       const f = await callAgent(agent, 'fs-read', { path: p }, 30000);
       const buf = Buffer.from(f.data, 'base64');
@@ -219,7 +219,7 @@ function startHub(port = 8888, opts = {}) {
   });
   app.get('/api/logs/:termId', (req, res) => {
     const ts = terms.get(req.params.termId);
-    if (!ts) return res.status(404).json({ error: 'oturum yok' });
+    if (!ts) return res.status(404).json({ error: 'no session' });
     res.type('text/plain; charset=utf-8').send((ts.log || []).join(''));
   });
 
@@ -232,9 +232,9 @@ function startHub(port = 8888, opts = {}) {
   }));
   app.post('/api/config', (req, res) => {
     const body = req.body || {};
-    if (body.whitelist !== undefined && !Array.isArray(body.whitelist)) return res.status(400).json({ error: 'whitelist dizi olmalı' });
+    if (body.whitelist !== undefined && !Array.isArray(body.whitelist)) return res.status(400).json({ error: 'whitelist must be an array' });
     const next = saveConfig(body);
-    console.log('[Hub] ayarlar güncellendi');
+    console.log('[Hub] settings updated');
     res.json(next);
   });
 
@@ -261,7 +261,7 @@ function startHub(port = 8888, opts = {}) {
     info.remote = (await git.remote(repoDir, branch)) || info.remote;
     info.update = !!(info.remote && info.commit && info.remote !== info.commit);
     io.emit('repo-info', info);
-    if (!silent) console.log(info.update ? `[Hub] güncelleme var: ${info.commit} -> ${info.remote}` : `[Hub] güncel (${info.commit})`);
+    if (!silent) console.log(info.update ? `[Hub] update available: ${info.commit} -> ${info.remote}` : `[Hub] up to date (${info.commit})`);
     return info.update;
   }
 
@@ -269,7 +269,7 @@ function startHub(port = 8888, opts = {}) {
     if (busy) return;
     busy = true;
     const has = await refresh(true);
-    io.emit('update-status', { from: 'Hub', stage: 'start', msg: has ? `Güncelleme (${info.commit} -> ${info.remote})` : 'Doğrulanıyor.' });
+    io.emit('update-status', { from: 'Hub', stage: 'start', msg: has ? `Update (${info.commit} -> ${info.remote})` : 'Verifying.' });
     io.emit('update-command', { branch, repoDir });
     if (has) {
       try {
@@ -277,7 +277,7 @@ function startHub(port = 8888, opts = {}) {
         await git.pull(repoDir, branch);
         io.emit('update-status', { from: 'Hub', stage: 'install', msg: 'Hub npm install...' });
         await git.install(repoDir);
-        io.emit('update-status', { from: 'Hub', stage: 'restart', msg: 'Hub yeniden başlatılıyor...' });
+        io.emit('update-status', { from: 'Hub', stage: 'restart', msg: 'Hub restarting...' });
         restart(process.argv.slice(2));
       } catch (e) {
         io.emit('update-status', { from: 'Hub', stage: 'error', msg: e.message });
@@ -316,7 +316,7 @@ function startHub(port = 8888, opts = {}) {
         if (prev.timer) clearTimeout(prev.timer);
         if (prev.offlineNotified) {
           prev.offlineNotified = false;
-          notify(cfg, [['DURUM', 'ÇEVRİMİÇİ'], ['Cihaz', a.hostname]]);
+          notify(cfg, [['STATUS', 'ONLINE'], ['Device', a.hostname]]);
           io.emit('alert', { agentId: a.id, hostname: a.hostname, metric: 'online', value: 0, limit: 0 });
         }
       }
@@ -335,7 +335,7 @@ function startHub(port = 8888, opts = {}) {
         clearTimeout(p.timer);
         pendingOps.delete(opId);
         if (ok) p.resolve(data);
-        else p.reject(new Error(error || 'op hatası'));
+        else p.reject(new Error(error || 'op failed'));
       });
 
       // Terminal relay: agent -> browser (+ session log capture)
@@ -363,9 +363,9 @@ function startHub(port = 8888, opts = {}) {
           st.timer = setTimeout(() => {
             if (!st.offlineNotified) {
               st.offlineNotified = true;
-              notify(cfg, [['DURUM', 'ÇEVRİMDIŞI'], ['Cihaz', a.hostname]]);
+              notify(cfg, [['STATUS', 'OFFLINE'], ['Device', a.hostname]]);
               io.emit('alert', { agentId: a.id, hostname: a.hostname, metric: 'offline', value: 100, limit: 100 });
-              console.log(`[Hub] ÇEVRİMDIŞI: ${a.hostname}`);
+              console.log(`[Hub] OFFLINE: ${a.hostname}`);
             }
           }, offSec * 1000);
         }
@@ -390,7 +390,7 @@ function startHub(port = 8888, opts = {}) {
           });
           agentSock.emit('term-init', { termId, cols, rows });
         } else {
-          socket.emit('term-output', { termId, data: '\r\n\x1b[31mAgent çevrimdışı.\x1b[0m\r\n' });
+          socket.emit('term-output', { termId, data: '\r\n\x1b[31mAgent offline.\x1b[0m\r\n' });
         }
       });
 

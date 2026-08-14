@@ -1,8 +1,8 @@
 {
-  "name": "Nexus - Cihaz Yönetimi",
+  "name": "Nexus - Device Management",
   "short_name": "Nexus",
-  "description": "Hub & agent cihaz yönetim ve uzaktan terminal sistemi",
-  "lang": "tr",
+  "description": "Hub & agent device management and remote terminal system",
+  "lang": "en",
   "start_url": "/",
   "display": "standalone",
   "orientation": "any",

@@ -1,4 +1,4 @@
-const CACHE = 'nexus-v1';
+const CACHE = 'nexus-v2';
 const PRECACHE = ['/', '/manifest.json', '/icons/icon-192.png', '/icons/icon-512.png', '/xterm/lib/xterm.js', '/xterm/css/xterm.css'];
 
 self.addEventListener('install', (e) => {

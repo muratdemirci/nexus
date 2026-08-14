@@ -33,19 +33,19 @@ const cfg = parseArgs();
 if (process.argv.includes('--install') || process.argv.includes('--uninstall')) {
   const { installService, uninstallService } = require('./svc');
   const r = process.argv.includes('--install') ? installService() : uninstallService();
-  console.log(`\n  [Servis] ${r.msg || r.error}`);
-  if (!r.ok && r.error) console.log(`  Hata: ${r.error}`);
+  console.log(`\n  [Service] ${r.msg || r.error}`);
+  if (!r.ok && r.error) console.log(`  Error: ${r.error}`);
   process.exit(r.ok ? 0 : 1);
 }
 
-console.log(`\n  NEXUS  —  mod: ${cfg.mode.toUpperCase()}\n  ${cfg.mode !== 'agent' ? `hub: http://localhost:${cfg.port}` : `agent -> ${cfg.hub} (${cfg.name})`} | keşif: ${cfg.discover ? 'LAN açık' : 'kapalı'}\n`);
+  console.log(`\n  NEXUS  —  mode: ${cfg.mode.toUpperCase()}\n  ${cfg.mode !== 'agent' ? `hub: http://localhost:${cfg.port}` : `agent -> ${cfg.hub} (${cfg.name})`} | discovery: ${cfg.discover ? 'LAN on' : 'off'}\n`);
 
 // OS-aware firewall check/setup (auto at startup unless --no-firewall).
 if (cfg.firewall) {
   process.env.NEXUS_PORT = String(cfg.port);
   const { checkFirewall, ensureFirewall } = require('./setup');
   checkFirewall().then((ck) => {
-    console.log(`  OS: ${ck.os} | firewall: ${ck.applied ? 'kural aktif' : 'kuralsız'}`);
+    console.log(`  OS: ${ck.os} | firewall: ${ck.applied ? 'rule active' : 'no rule'}`);
     if (!ck.applied) {
       ensureFirewall().then((r) => r.lines.forEach((l) => console.log(`  ${r.mode === 'ok' ? '' : 'firewall '}${l}`)));
     }

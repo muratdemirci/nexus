@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="tr">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -26,25 +26,25 @@
   .layout { display:grid; grid-template-columns:1fr 340px; gap:20px; padding:20px 28px; }
   @media (max-width:900px) { .layout { grid-template-columns:1fr; } }
   .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(360px,1fr)); gap:16px; }
-  .card { background:var(--panel); border:1px solid var(--border); border-radius:10px; padding:18px; border-left:3px solid var(--green); position:relative; }
+  .card { background:var(--panel); border:1px solid var(--border); border-radius:10px; padding:14px 16px; border-left:3px solid var(--green); position:relative; }
   .card.warn { border-left-color:var(--yellow); }
   .card.crit { border-left-color:var(--red); }
-  .card .net-badge { position:absolute; top:14px; right:14px; font-size:11px; padding:2px 8px; border-radius:10px; font-weight:600; }
+  .card .net-badge { position:absolute; top:12px; right:14px; font-size:11px; padding:2px 8px; border-radius:10px; font-weight:600; }
   .card .net-online { background:rgba(74,222,128,.15); color:var(--green); }
   .card .net-offline { background:rgba(248,113,113,.15); color:var(--red); }
-  .card h3 { font-size:15px; margin-bottom:2px; padding-right:80px; }
-  .card .sub { color:var(--dim); font-size:12px; margin-bottom:14px; }
-  .card .sysinfo { font-size:11px; color:var(--dim); margin-bottom:12px; line-height:1.7; }
+  .card h3 { font-size:15px; margin-bottom:2px; padding-right:80px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .card .sub { color:var(--dim); font-size:12px; margin-bottom:10px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .card .sysinfo { font-size:11px; color:var(--dim); margin-bottom:10px; line-height:1.5; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; overflow:hidden; }
   .card .sysinfo span { color:var(--text); }
-  .bars { display:flex; flex-direction:column; gap:8px; margin-bottom:12px; }
+  .bars { display:flex; flex-direction:column; gap:6px; margin-bottom:10px; }
   .bar { display:flex; align-items:center; gap:8px; font-size:12px; }
   .bar .label { width:34px; color:var(--dim); }
-  .bar .track { flex:1; height:7px; background:var(--bg); border-radius:4px; overflow:hidden; }
+  .bar .track { flex:1; height:6px; background:var(--bg); border-radius:4px; overflow:hidden; }
   .bar .fill { display:block; height:100%; border-radius:4px; transition:width .35s ease, background .35s ease; background:var(--accent); }
   .bar .val { width:72px; text-align:right; font-family:monospace; color:var(--dim); }
-  .card .footer { display:flex; justify-content:space-between; align-items:center; font-size:11px; color:var(--dim); margin-bottom:10px; }
-  .card-actions { display:flex; gap:6px; flex-wrap:wrap; }
-  .term-btn { background:var(--accent); color:var(--bg); border:none; padding:5px 10px; border-radius:5px; font-weight:600; cursor:pointer; font-size:11px; }
+  .card .footer { display:flex; justify-content:space-between; align-items:center; font-size:11px; color:var(--dim); margin-bottom:8px; }
+  .card-actions { display:flex; gap:4px; flex-wrap:nowrap; }
+  .term-btn { background:var(--accent); color:var(--bg); border:none; padding:4px 8px; border-radius:5px; font-weight:600; cursor:pointer; font-size:10px; flex:1; white-space:nowrap; }
   .term-btn:hover { opacity:.85; }
   .term-btn.ghost { background:var(--panel); color:var(--text); border:1px solid var(--border); }
   .term-btn.ghost:hover { border-color:var(--accent); }
@@ -62,7 +62,7 @@
   .net-item .who b { color:var(--text); }
   .net-item .who .ip { color:var(--dim); font-family:monospace; font-size:11px; }
   .net-empty { color:var(--dim); font-size:12px; padding:6px 8px; }
-  .log-body { font-family:monospace; font-size:12px; max-height:340px; overflow-y:auto; display:flex; flex-direction:column-reverse; gap:3px; }
+  .log-body { font-family:monospace; font-size:12px; height:340px; overflow-y:auto; display:flex; flex-direction:column-reverse; gap:3px; }
   .log-body .entry { color:var(--dim); word-break:break-word; }
   .log-body .entry .from { color:var(--accent); }
   .log-body .entry.error { color:var(--red); }
@@ -125,32 +125,32 @@
   <h1>N E X <span>U S</span></h1>
   <div class="repo-bar">
     <span class="commit" id="commitText">—</span>
-    <span id="updateBadge" style="display:none" class="update">● güncelleme var</span>
+    <span id="updateBadge" style="display:none" class="update">● update available</span>
   </div>
   <div class="topbar-actions">
     <button class="tbtn" onclick="openQr()">◈ Mobil</button>
-    <button class="tbtn" onclick="openBatch()">» Komut</button>
-    <button class="tbtn" onclick="openHistory()">⇄ Kayıt</button>
-    <button class="tbtn" onclick="openSettings()">⚙ Ayarlar</button>
+    <button class="tbtn" onclick="openBatch()">» Command</button>
+    <button class="tbtn" onclick="openHistory()">⇄ Logs</button>
+    <button class="tbtn" onclick="openSettings()">⚙ Settings</button>
   </div>
 </div>
 
 <div class="layout">
   <div class="grid" id="agentGrid">
-    <div class="empty">Cihaz bekleniyor...</div>
+    <div class="empty">Waiting for devices...</div>
   </div>
   <div class="side">
     <div class="net">
-      <h3>AĞDAKİ CİHAZLAR</h3>
-      <div id="netBody"><div class="net-empty">Keşif devam ediyor...</div></div>
+      <h3>DEVICES ON NETWORK</h3>
+      <div id="netBody"><div class="net-empty">Discovery running...</div></div>
     </div>
     <div class="log">
-      <h3>GÜNLÜK · UYARILAR</h3>
+      <h3>LOG · ALERTS</h3>
       <div class="log-body" id="logBody"></div>
     </div>
     <div class="history">
-      <h3>SON KOMUTLAR</h3>
-      <div id="histBody"><div class="net-empty">Henüz komut çalıştırılmadı.</div></div>
+      <h3>RECENT COMMANDS</h3>
+      <div id="histBody"><div class="net-empty">No commands run yet.</div></div>
     </div>
   </div>
 </div>
@@ -196,7 +196,7 @@ let procAgentId = null;
 function esc(s) {
   return String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
 }
-function fmtTime(ms) { return ms ? new Date(ms).toLocaleTimeString('tr') : '—'; }
+function fmtTime(ms) { return ms ? new Date(ms).toLocaleTimeString('en') : '—'; }
 function fmtSize(n) {
   if (n == null) return '';
   if (n >= 1e9) return (n/1e9).toFixed(1)+' GB';
@@ -207,7 +207,7 @@ function fmtSize(n) {
 function uptimeFmt(s) {
   if (!s) return '—';
   const d = Math.floor(s/86400), h = Math.floor(s%86400/3600), m = Math.floor(s%3600/60);
-  return (d?d+'g ':'')+(h?h+'s ':'')+m+'dk';
+  return (d?d+'d ':'')+(h?h+'h ':'')+m+'m';
 }
 function fmtKB(kb) { return kb > 1024 ? (kb/1024).toFixed(1)+' MB/s' : kb.toFixed(1)+' KB/s'; }
 function fillColor(v, y, r) { return v >= (r||90) ? 'var(--red)' : v >= (y||75) ? 'var(--yellow)' : 'var(--accent)'; }
@@ -219,7 +219,7 @@ function cardClass(s) {
 
 function renderAgents(list) {
   agentsCache = list || [];
-  if (!list || !list.length) { grid.innerHTML = '<div class="empty">Cihaz bekleniyor...</div>'; return; }
+  if (!list || !list.length) { grid.innerHTML = '<div class="empty">Waiting for devices...</div>'; return; }
   grid.innerHTML = list.map(a => {
     const s = a.stats || {};
     const net = s.netOnline ? `<span class="net-badge net-online">● online</span>` : `<span class="net-badge net-offline">● offline</span>`;
@@ -230,8 +230,8 @@ function renderAgents(list) {
       <h3>${esc(a.hostname)}</h3>
       <div class="sub">${esc(a.osDistro || a.platform)} · ${esc(a.ip)}</div>
       <div class="sysinfo">
-        ${a.cpuModel ? `CPU: <span>${esc(a.cpuModel)}</span> (${a.cpuCores} çekirdek)<br>` : ''}
-        ${a.ramTotal ? `RAM: <span>${a.ramTotal} GB</span> · ` : ''}${a.manufacturer ? `Donanım: <span>${esc(a.manufacturer)}</span>` : ''}
+        ${a.cpuModel ? `CPU: <span>${esc(a.cpuModel)}</span> (${a.cpuCores} cores)<br>` : ''}
+        ${a.ramTotal ? `RAM: <span>${a.ramTotal} GB</span> · ` : ''}${a.manufacturer ? `Hardware: <span>${esc(a.manufacturer)}</span>` : ''}
       </div>
       <div class="bars">
         <div class="bar"><span class="label">CPU</span><span class="track"><span class="fill" style="width:${s.cpu||0}%;background:${fillColor(s.cpu||0,75,90)}"></span></span><span class="val">${s.cpu||0}%</span></div>
@@ -240,12 +240,12 @@ function renderAgents(list) {
         <div class="bar"><span class="label">DL</span><span class="track"><span class="fill" style="width:${dlPct}%;background:var(--green)"></span></span><span class="val">${fmtKB(s.netRx||0)}</span></div>
         <div class="bar"><span class="label">UL</span><span class="track"><span class="fill" style="width:${ulPct}%;background:var(--yellow)"></span></span><span class="val">${fmtKB(s.netTx||0)}</span></div>
       </div>
-      <div class="footer"><span>açık: ${uptimeFmt(s.uptime)}</span><span id="online-${esc(a.hostname)}"></span></div>
+      <div class="footer"><span>up: ${uptimeFmt(s.uptime)}</span><span id="online-${esc(a.hostname)}"></span></div>
       <div class="card-actions">
         <button class="term-btn" onclick="openTerm('${a.id}','${esc(a.hostname)}')">Terminal</button>
-        <button class="term-btn ghost" onclick="openProcesses('${a.id}','${esc(a.hostname)}')">İşlemler</button>
-        <button class="term-btn ghost" onclick="openFiles('${a.id}','${esc(a.hostname)}')">Dosyalar</button>
-        <button class="term-btn danger" onclick="restartAgent('${a.id}','${esc(a.hostname)}')">Yeniden Başlat</button>
+        <button class="term-btn ghost" onclick="openProcesses('${a.id}','${esc(a.hostname)}')">Processes</button>
+        <button class="term-btn ghost" onclick="openFiles('${a.id}','${esc(a.hostname)}')">Files</button>
+        <button class="term-btn danger" onclick="restartAgent('${a.id}','${esc(a.hostname)}')">Restart</button>
       </div>
     </div>`;
   }).join('');
@@ -262,7 +262,7 @@ function updateAgentStats({ id, stats }) {
 function logEntry(from, msg, kind) {
   const div = document.createElement('div');
   div.className = 'entry' + (kind ? ' ' + kind : '');
-  div.innerHTML = `<span class="from">[${new Date().toLocaleTimeString('tr')}] ${esc(from)}</span> ${esc(msg)}`;
+  div.innerHTML = `<span class="from">[${new Date().toLocaleTimeString('en')}] ${esc(from)}</span> ${esc(msg)}`;
   logBody.prepend(div);
   while (logBody.children.length > 100) logBody.removeChild(logBody.lastChild);
 }
@@ -289,15 +289,15 @@ async function openQr() {
   try {
     const r = await fetch('/api/hostinfo').then(x => x.json());
     const ip = r.host;
-    showModal(`Mobil Erişim — ${esc(r.hostname)}`, `
+    showModal(`Mobile Access — ${esc(r.hostname)}`, `
       <div class="qr-box">
         <div>
           <div class="qr-url" id="qrUrl">${esc(r.url)}</div>
           <div class="legend">LAN: ${r.lanIPs.map(esc).join(', ') || '—'}${r.tailscaleIP ? '<br>Tailscale: <b>' + esc(r.tailscaleIP) + '</b>' : ''}</div>
           <div class="mform" style="margin-top:14px">
-            <label>Farklı adres (ör. tailscale: <b>${esc(r.tailscaleIP || '')}</b> veya IP)</label>
+            <label>Different address (e.g. tailscale: <b>${esc(r.tailscaleIP || '')}</b> or IP)</label>
             <input id="qrHostInput" value="${esc(r.host)}" placeholder="192.168.1.10">
-            <button class="btn" style="margin-top:8px" onclick="qrUpdate()">QR Yenile</button>
+            <button class="btn" style="margin-top:8px" onclick="qrUpdate()">Refresh QR</button>
           </div>
         </div>
         <img id="qrImg" class="qr-img" alt="QR" src="/api/qr?host=${encodeURIComponent(r.host)}">
@@ -320,16 +320,16 @@ function openBatch(agentId, hostname) {
       <input type="checkbox" data-id="${a.id}" ${!agentId ? 'checked' : ''} style="accent-color:var(--accent)">
       ${esc(a.hostname)}
     </label>`).join('');
-  showModal(agentId ? `Komut — ${esc(hostname)}` : 'Toplu Komut', `
+  showModal(agentId ? `Command — ${esc(hostname)}` : 'Batch Command', `
     <div class="mform">
-      <div class="row"><label>Cihazlar</label><div class="chips" id="batchChips">${checks || '<div class="net-empty">Agent yok</div>'}</div></div>
-      <div class="row"><label>Komut (whitelist'e takılırsa engellenir)</label>
-        <textarea id="bcCmd" rows="2" placeholder="ör. df -h"></textarea></div>
+      <div class="row"><label>Devices</label><div class="chips" id="batchChips">${checks || '<div class="net-empty">No agents</div>'}</div></div>
+      <div class="row"><label>Command (blocked if not whitelisted)</label>
+        <textarea id="bcCmd" rows="2" placeholder="e.g. df -h"></textarea></div>
       <div class="row2">
-        <div class="row"><label>Dizin (opsiyonel)</label><input id="bcCwd" placeholder="${esc(navigator.userAgent.includes('Win') ? 'C:\\Users' : '~')}"></div>
-        <div class="row"><label>Zaman aşımı (sn)</label><input id="bcTimeout" type="number" value="30"></div>
+        <div class="row"><label>Directory (optional)</label><input id="bcCwd" placeholder="${esc(navigator.userAgent.includes('Win') ? 'C:\\Users' : '~')}"></div>
+        <div class="row"><label>Timeout (sec)</label><input id="bcTimeout" type="number" value="30"></div>
       </div>
-      <button class="btn" id="bcRun" onclick="runBatch()">Çalıştır</button>
+      <button class="btn" id="bcRun" onclick="runBatch()">Run</button>
     </div>
     <div id="bcResults" style="margin-top:14px"></div>`, true);
 }
@@ -339,10 +339,10 @@ async function runBatch() {
   const cwd = document.getElementById('bcCwd').value.trim();
   const timeout = parseInt(document.getElementById('bcTimeout').value, 10) || 30;
   const btn = document.getElementById('bcRun');
-  if (!ids.length || !command) { alert('Komut ve cihaz seçin'); return; }
-  btn.disabled = true; btn.textContent = 'Çalışıyor...';
+  if (!ids.length || !command) { alert('Select a command and device'); return; }
+  btn.disabled = true; btn.textContent = 'Running...';
   const div = document.getElementById('bcResults');
-  div.innerHTML = '<div class="result-block"><div class="head">gönderiliyor...</div></div>';
+  div.innerHTML = '<div class="result-block"><div class="head">sending...</div></div>';
   try {
     const res = await fetch('/api/run', {
       method: 'POST',
@@ -353,24 +353,24 @@ async function runBatch() {
     for (const a of agentsCache) names[a.id] = a.hostname;
     div.innerHTML = Object.entries(res).map(([id, r]) => {
       const name = names[id] || '?';
-      if (!r.ok) return `<div class="result-block err"><div class="head">${esc(name)} — hata</div>${esc(r.error || '')}</div>`;
-      const out = r.data.stdout || '(çıktı yok)';
+      if (!r.ok) return `<div class="result-block err"><div class="head">${esc(name)} — error</div>${esc(r.error || '')}</div>`;
+      const out = r.data.stdout || '(no output)';
       const err = r.data.stderr ? '\n[stderr]\n' + r.data.stderr : '';
       const cls = r.data.code === 0 ? 'code-0' : 'err';
       return `<div class="result-block ${cls}">
-        <div class="head">${esc(name)} · çıkış kodu ${r.data.code}</div>${esc(out)}${esc(err)}
+        <div class="head">${esc(name)} · exit code ${r.data.code}</div>${esc(out)}${esc(err)}
       </div>`;
-    }).join('') || '<div class="net-empty">Sonuç yok</div>';
+    }).join('') || '<div class="net-empty">No results</div>';
   } catch (e) {
-    div.innerHTML = `<div class="result-block err"><div class="head">hata</div>${esc(e.message)}</div>`;
+    div.innerHTML = `<div class="result-block err"><div class="head">error</div>${esc(e.message)}</div>`;
   }
-  btn.disabled = false; btn.textContent = 'Çalıştır';
+  btn.disabled = false; btn.textContent = 'Run';
 }
 
 // ===== Process manager =====
 function openProcesses(agentId, hostname) {
   procAgentId = agentId;
-  showModal(`İşlemler — ${esc(hostname)}`, `<div id="procBody"><div class="net-empty">Yükleniyor...</div></div>`, true);
+  showModal(`Processes — ${esc(hostname)}`, `<div id="procBody"><div class="net-empty">Loading...</div></div>`, true);
   loadProcs();
   if (procTimer) clearInterval(procTimer);
   procTimer = setInterval(loadProcs, 4000);
@@ -384,7 +384,7 @@ async function loadProcs() {
     if (!body) return;
     const sorted = list.slice().sort((a, b) => b.cpu - a.cpu);
     body.innerHTML = `<table>
-      <tr><th>PID</th><th>İsim</th><th>CPU</th><th>RAM MB</th><th>Komut</th><th></th></tr>
+      <tr><th>PID</th><th>Name</th><th>CPU</th><th>RAM MB</th><th>Command</th><th></th></tr>
       ${sorted.map(p => `<tr>
         <td class="mono">${p.pid}</td>
         <td>${esc(p.name)}</td>
@@ -410,14 +410,14 @@ async function killProc(pid) {
 // ===== File explorer =====
 async function openFiles(agentId, hostname) {
   fsState = { agentId, hostname, path: '' };
-  showModal(`Dosyalar — ${esc(hostname)}`, `<div id="fsBody"><div class="net-empty">Yükleniyor...</div></div>`, true);
+  showModal(`Files — ${esc(hostname)}`, `<div id="fsBody"><div class="net-empty">Loading...</div></div>`, true);
   fsLoad('/');
 }
 async function fsLoad(p) {
   const body = document.getElementById('fsBody');
   if (!body) return;
   fsState.path = p || '';
-  body.innerHTML = '<div class="net-empty">Yükleniyor...</div>';
+  body.innerHTML = '<div class="net-empty">Loading...</div>';
   try {
     const d = await fetch(`/api/fs?agent=${encodeURIComponent(fsState.agentId)}&path=${encodeURIComponent(p || '')}`).then(r => r.json());
     if (d.error) throw new Error(d.error);
@@ -437,13 +437,13 @@ async function fsLoad(p) {
     body.innerHTML = `
       <div class="fs-path" id="fsPath">${esc(fsState.path || '/')}</div>
       <div class="card-actions" style="margin-bottom:10px">
-        ${fsState.path ? `<button class="term-btn ghost" onclick="fsParent()">↑ Üst dizin</button>` : ''}
-        <label class="term-btn ghost" style="display:inline-block;cursor:pointer">⬆ Yükle
+        ${fsState.path ? `<button class="term-btn ghost" onclick="fsParent()">↑ Parent</button>` : ''}
+        <label class="term-btn ghost" style="display:inline-block;cursor:pointer">⬆ Upload
           <input type="file" id="fsFile" style="display:none" onchange="fsUpload()">
         </label>
-        <button class="term-btn" onclick="fsRefresh()">↻ Yenile</button>
+        <button class="term-btn" onclick="fsRefresh()">↻ Refresh</button>
       </div>
-      ${rows || '<div class="net-empty">Boş dizin</div>'}`;
+      ${rows || '<div class="net-empty">Empty directory</div>'}`;
   } catch (e) {
     body.innerHTML = `<div class="result-block err">${esc(e.message)}</div>`;
   }
@@ -465,23 +465,23 @@ async function fsUpload() {
   const dest = fsState.path + (fsState.path && !fsState.path.endsWith('/') && !fsState.path.endsWith('\\') ? '/' : '') + file.name;
   try {
     await fetch(`/api/upload?agent=${encodeURIComponent(fsState.agentId)}&path=${encodeURIComponent(dest)}`, { method: 'POST', body: file });
-    logEntry('Dosya', `${file.name} → ${fsState.hostname}:${dest}`, '');
+    logEntry('File', `${file.name} → ${fsState.hostname}:${dest}`, '');
     fsRefresh();
   } catch (e) { alert(e.message); }
 }
 
 // ===== Restart agent =====
 async function restartAgent(agentId, hostname) {
-  if (!confirm(`${hostname} yeniden başlatılsın mı?`)) return;
+  if (!confirm(`Restart ${hostname}?`)) return;
   try {
     await fetch('/api/restart/' + agentId, { method: 'POST' });
-    logEntry('Yeniden Başlat', `${hostname} başlatılıyor...`, 'warn');
+    logEntry('Restart', `${hostname} starting...`, 'warn');
   } catch (e) { alert(e.message); }
 }
 
 // ===== History: commands + terminal logs =====
 async function openHistory() {
-  showModal('Kayıtlar — Komut Geçmişi & Terminal Oturumları', '<div class="net-empty">Yükleniyor...</div>', true);
+  showModal('Logs — Command History & Terminal Sessions', '<div class="net-empty">Loading...</div>', true);
   const names = {};
   for (const a of agentsCache) names[a.id] = a.hostname;
   try {
@@ -492,18 +492,18 @@ async function openHistory() {
     const histRows = hist.map(h => h.list.map((c, i) => `
       <li>
         <span class="cmd">${esc(c.command)}</span>
-        <span class="time">${names[h.id] || h.id.slice(0,8)} · ${new Date(c.ts).toLocaleTimeString('tr')} · kod ${c.code}</span>
+        <span class="time">${names[h.id] || h.id.slice(0,8)} · ${new Date(c.ts).toLocaleTimeString('en')} · code ${c.code}</span>
       </li>`).join('')).join('');
     const logRows = logs.map(l => `
       <li>
-        <span class="cmd">${esc(l.hostname)} · ${l.start ? new Date(l.start).toLocaleString('tr') : '—'} · ${fmtSize(l.chars)}</span>
-        <button class="term-btn ghost" onclick="viewLog('${l.termId}')">Görüntüle</button>
+        <span class="cmd">${esc(l.hostname)} · ${l.start ? new Date(l.start).toLocaleString('en') : '—'} · ${fmtSize(l.chars)}</span>
+        <button class="term-btn ghost" onclick="viewLog('${l.termId}')">View</button>
       </li>`).join('');
     const body = document.getElementById('mBody');
     body.innerHTML = `
-      <h3 style="font-size:13px;color:var(--dim);margin:6px 0 8px">KOMUT GEÇMİŞİ</h3>
+      <h3 style="font-size:13px;color:var(--dim);margin:6px 0 8px">COMMAND HISTORY</h3>
       <ul class="hlist">${histRows || '<li><span class="cmd">—</span></li>'}</ul>
-      <h3 style="font-size:13px;color:var(--dim);margin:18px 0 8px">TERMİNAL OTURUMLARI</h3>
+      <h3 style="font-size:13px;color:var(--dim);margin:18px 0 8px">TERMINAL SESSIONS</h3>
       <ul class="hlist">${logRows || '<li><span class="cmd">—</span></li>'}</ul>`;
   } catch (e) {
     const body = document.getElementById('mBody');
@@ -513,34 +513,34 @@ async function openHistory() {
 async function viewLog(termId) {
   try {
     const text = await fetch('/api/logs/' + termId).then(r => r.text());
-    showModal('Terminal Oturumu', `<pre class="biglog">${esc(text) || '(boş)'}</pre>`, true);
+    showModal('Terminal Session', `<pre class="biglog">${esc(text) || '(empty)'}</pre>`, true);
   } catch (e) { alert(e.message); }
 }
 
 // ===== Settings =====
 async function openSettings() {
-  showModal('Ayarlar', '<div class="net-empty">Yükleniyor...</div>');
+  showModal('Settings', '<div class="net-empty">Loading...</div>');
   try {
     const cfg = await fetch('/api/config').then(r => r.json());
     const body = document.getElementById('mBody');
     body.innerHTML = `
       <div class="mform">
-        <h3 style="font-size:13px;color:var(--dim);margin-bottom:8px">KOMUT WHITELIST (satır başına bir komut — boş = her şey serbest)</h3>
+        <h3 style="font-size:13px;color:var(--dim);margin-bottom:8px">COMMAND WHITELIST (one command per line — empty = allow all)</h3>
         <div class="row"><textarea id="stWhitelist" rows="5">${esc((cfg.whitelist||[]).join('\n'))}</textarea></div>
-        <h3 style="font-size:13px;color:var(--dim);margin:18px 0 8px">EŞİK DEĞERLERİ (%) — aşılırsa bildirim + UI uyarısı</h3>
+        <h3 style="font-size:13px;color:var(--dim);margin:18px 0 8px">THRESHOLDS (%) — notification + UI alert when exceeded</h3>
         <div class="row2">
           <div class="row"><label>CPU</label><input id="stCpu" type="number" value="${cfg.thresholds && cfg.thresholds.cpu != null ? cfg.thresholds.cpu : ''}"></div>
           <div class="row"><label>RAM</label><input id="stRam" type="number" value="${cfg.thresholds && cfg.thresholds.ram != null ? cfg.thresholds.ram : ''}"></div>
           <div class="row"><label>Disk</label><input id="stDisk" type="number" value="${cfg.thresholds && cfg.thresholds.disk != null ? cfg.thresholds.disk : ''}"></div>
-          <div class="row"><label>Çevrimdışı (sn)</label><input id="stOff" type="number" value="${cfg.thresholds && cfg.thresholds.offline != null ? cfg.thresholds.offline : ''}"></div>
+          <div class="row"><label>Offline (sec)</label><input id="stOff" type="number" value="${cfg.thresholds && cfg.thresholds.offline != null ? cfg.thresholds.offline : ''}"></div>
         </div>
-        <h3 style="font-size:13px;color:var(--dim);margin:18px 0 8px">BİLDİRİM (Telegram + Discord — boş bırakılırsa devre dışı)</h3>
+        <h3 style="font-size:13px;color:var(--dim);margin:18px 0 8px">NOTIFICATIONS (Telegram + Discord — leave blank to disable)</h3>
         <div class="row"><label>Telegram Bot Token</label><input id="stTgToken" value="${esc((cfg.notify&&cfg.notify.telegram&&cfg.notify.telegram.token)||'')}" placeholder="123456:ABC..."></div>
         <div class="row"><label>Telegram Chat ID</label><input id="stTgChat" value="${esc((cfg.notify&&cfg.notify.telegram&&cfg.notify.telegram.chatId)||'')}"></div>
         <div class="row"><label>Discord Webhook</label><input id="stDcUrl" value="${esc((cfg.notify&&cfg.notify.discord&&cfg.notify.discord.webhook)||'')}" placeholder="https://discord.com/api/webhooks/..."></div>
-        <div class="row"><label>QR adresi zorla (opsiyonel — ör. tailscale IP)</label><input id="stQr" value="${esc(cfg.qrHost||'')}"></div>
-        <div class="legend">Not: komut whitelist'i bu hub'ın UI'ından çalışan komutlar için geçerlidir. Kaydedince ağdaki tüm agent'lara da yansır.</div>
-        <button class="btn" onclick="saveSettings()">Kaydet</button>
+        <div class="row"><label>Force QR address (optional — e.g. tailscale IP)</label><input id="stQr" value="${esc(cfg.qrHost||'')}"></div>
+        <div class="legend">Note: the command whitelist applies to commands run from this hub's UI. When saved, it is pushed to all agents on the network.</div>
+        <button class="btn" onclick="saveSettings()">Save</button>
       </div>`;
   } catch (e) {
     const body = document.getElementById('mBody');
@@ -564,7 +564,7 @@ async function saveSettings() {
   };
   try {
     await fetch('/api/config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-    logEntry('Ayarlar', 'kaydedildi', '');
+    logEntry('Settings', 'saved', '');
     closeModal();
   } catch (e) { alert(e.message); }
 }
@@ -575,9 +575,9 @@ function renderHistory(data) {
   const rows = (data || []).flatMap(h => (h.list || []).slice(-5).map(c => ({ id: h.id, ...c }))).slice(-8).reverse();
   histBody.innerHTML = rows.length ? rows.map(c =>
     `<div style="font-family:monospace;font-size:11px;padding:4px 0;border-bottom:1px dashed var(--border)">
-       <span style="color:var(--dim)">${esc(names[c.id] || c.id.slice(0,8))} · ${new Date(c.ts).toLocaleTimeString('tr')}</span><br>
+       <span style="color:var(--dim)">${esc(names[c.id] || c.id.slice(0,8))} · ${new Date(c.ts).toLocaleTimeString('en')}</span><br>
        <span style="color:var(--text)">${esc(c.command)}</span>
-     </div>`).join('') : '<div class="net-empty">Henüz komut çalıştırılmadı.</div>';
+     </div>`).join('') : '<div class="net-empty">No commands run yet.</div>';
 }
 
 // Terminal
@@ -611,10 +611,10 @@ socket.on('stats-update', updateAgentStats);
 socket.on('history-update', renderHistory);
 socket.on('alert', ({ hostname, metric, value, limit }) => {
   const ic = metric.toUpperCase().replace('_', ' ');
-  logEntry('UYARI', `${hostname}: ${ic} ${metric === 'offline' || metric === 'online' ? '' : value + '%'} (eşik %' + limit + ')`, metric === 'online' ? '' : 'warn');
+  logEntry('ALERT', `${hostname}: ${ic} ${metric === 'offline' || metric === 'online' ? '' : value + '%'} (threshold %' + limit + ')`, metric === 'online' ? '' : 'warn');
 });
 socket.on('repo-info', (i) => {
-  commitText.textContent = i.commit ? `${i.branch||''}@${i.commit}` : 'git yok';
+  commitText.textContent = i.commit ? `${i.branch||''}@${i.commit}` : 'no git';
   updateBadge.style.display = i.update ? '' : 'none';
 });
 socket.on('update-status', ({from, stage, msg}) => logEntry(from, `${stage}: ${msg}`, stage === 'error' ? 'error' : (stage === 'start' || stage === 'restart' ? 'warn' : '')));
@@ -623,12 +623,12 @@ setInterval(() => fetch('/api/agents').then(r=>r.json()).then(renderAgents).catc
 
 const netBody = document.getElementById('netBody');
 function renderNetwork(list) {
-  if (!list || !list.length) { netBody.innerHTML = '<div class="net-empty">Ağda cihaz bulunamadı.</div>'; return; }
+  if (!list || !list.length) { netBody.innerHTML = '<div class="net-empty">No devices found on network.</div>'; return; }
   netBody.innerHTML = list.map(p => `
     <div class="net-item">
       <span class="tag ${p.role}">${p.role}</span>
       <span class="who"><b>${esc(p.hostname)}</b> <span class="ip">${esc(p.name||'')} · ${esc(p.src||p.ip)}</span></span>
-      <span style="color:var(--dim);font-size:11px">${new Date(p.lastSeen).toLocaleTimeString('tr')}</span>
+      <span style="color:var(--dim);font-size:11px">${new Date(p.lastSeen).toLocaleTimeString('en')}</span>
     </div>`).join('');
 }
 setInterval(() => fetch('/api/network').then(r=>r.json()).then(renderNetwork).catch(()=>{}), 2000);
