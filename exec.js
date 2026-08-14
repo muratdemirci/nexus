@@ -158,6 +158,67 @@ function writeFile(file, base64) {
   return { path: target, size: Buffer.from(base64, 'base64').length };
 }
 
+/**
+ * Kills a process by pid. Windows uses taskkill, unix uses process.kill.
+ */
+async function killProcess(pid, signal) {
+  if (!pid || typeof pid !== 'number') throw new Error('pid missing');
+  if (os.platform() === 'win32') {
+    const { execSync } = require('child_process');
+    execSync('taskkill', ['/PID', String(pid), '/T', '/F'], { windowsHide: true, stdio: 'pipe' });
+    return true;
+  }
+  try {
+    process.kill(pid, signal || 'SIGTERM');
+  } catch (e) {
+    if (e.code === 'ESRCH') throw new Error(`no such process: ${pid}`);
+    throw e;
+  }
+  return true;
+}
+
+/**
+ * Directory listing. Resolves relative paths against the home dir.
+ * Returns array of { name, type, size, mtime }.
+ */
+function listDir(dir) {
+  const target = dir && dir.trim() ? path.resolve(dir) : os.homedir();
+  const stat = fs.statSync(target);
+  if (!stat.isDirectory()) throw new Error(`not a directory: ${target}`);
+  return fs.readdirSync(target, { withFileTypes: true }).map((d) => {
+    let size = 0;
+    let mtime = 0;
+    try {
+      const s = fs.statSync(path.join(target, d.name));
+      size = d.isFile() ? s.size : 0;
+      mtime = s.mtimeMs;
+    } catch {}
+    return {
+      name: d.name,
+      type: d.isDirectory() ? 'dir' : 'file',
+      size,
+      mtime,
+    };
+  });
+}
+
+/**
+ * Process list via systeminformation (already a dependency). Lightweight, no
+ * child processes. Returns array of { pid, name, cpu, mem, command, user }.
+ */
+async function listProcesses() {
+  const si = require('systeminformation');
+  const data = await si.processes();
+  return (data.list || []).map((p) => ({
+    pid: p.pid,
+    name: p.name || '',
+    cpu: +(p.cpu || 0).toFixed(1),
+    mem: +(p.mem || 0).toFixed(1),
+    command: (p.command || '').slice(0, 300),
+    user: p.user || '',
+  }));
+}
+
 module.exports = {
   which,
   isAllowed,
