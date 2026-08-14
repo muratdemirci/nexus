@@ -363,8 +363,8 @@ function startAgent(
     socket.on("term-init", ({ termId, cols, rows }) => {
       const { shells: shellList, argsOf } = getTerminalShells();
       const home = os.homedir();
-      const cwd =
-        fs.existsSync(home) && fs.statSync(home).isDirectory() ? home : __dirname;
+      // __dirname yerine home kullan, doble Desktop önlenir
+      const cwd = home;
 
       const startTerm = (shell) => {
         const args = argsOf(shell);

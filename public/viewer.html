@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Nexus Dosya Görüntüleyici</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+      color: #e94560;
+      margin: 0;
+      padding: 20px;
+      min-height: 100vh;
+    }
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+    }
+    h1 {
+      text-align: center;
+      color: #e94560;
+      margin-bottom: 30px;
+    }
+    .file-info {
+      background: #1f2833;
+      padding: 20px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      border: 1px solid #0f3460;
+    }
+    .file-name {
+      font-size: 1.2rem;
+      color: #0f3460;
+      margin-bottom: 10px;
+    }
+    .file-type {
+      display: inline-block;
+      padding: 3px 8px;
+      background: #0f3460;
+      border-radius: 4px;
+      font-size: 0.85rem;
+      margin-right: 5px;
+      margin-bottom: 5px;
+    }
+    .viewer-area {
+      background: #0f3460;
+      border-radius: 8px;
+      padding: 20px;
+      min-height: 400px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid #0f3460;
+    }
+    video {
+      max-width: 100%;
+      max-height: 70%;
+      border-radius: 4px;
+    }
+    img {
+      max-width: 100%;
+      max-height: 70%;
+      border-radius: 4px;
+      object-fit: contain;
+    }
+    pre {
+      background: #16213e;
+      color: #a8d8ef;
+      padding: 15px;
+      border-radius: 8px;
+      overflow-x: auto;
+      font-family: 'Courier New', Courier, monospace;
+      white-space: pre-wrap;
+    }
+    .error-msg {
+      color: #e94560;
+      text-align: center;
+      padding: 40px;
+      font-size: 1.1rem;
+    }
+    .controls {
+      margin-top: 20px;
+      text-align: center;
+    }
+    .controls a {
+      color: #e94560;
+      text-decoration: none;
+      background: #0f3460;
+      padding: 8px 16px;
+      border-radius: 4px;
+      margin: 0 5px;
+      transition: background 0.3s;
+    }
+    .controls a:hover {
+      background: #1f4068;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Nexus Dosya Görüntüleyici</h1>
+    
+    <div class="file-info">
+      <div class="file-name" id="fileName">Dosya yolu belirtilmemiş</div>
+      <span class="file-type" id="fileType">--</span>
+    </div>
+    
+    <div class="viewer-area" id="viewer-area">
+      <!-- içerik dinamik olarak eklenecek -->
+    </div>
+    
+    <div class="controls">
+      <a href="/">Ana Sayfa'ya Dön</a>
+    </div>
+  </body>
+</html>

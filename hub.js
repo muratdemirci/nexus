@@ -234,6 +234,10 @@ function startHub(port = 8888, opts = {}) {
     res.json(next);
   });
 
+  app.get('/viewer', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'viewer.html'));
+  });
+
   function historyDump() {
     return [...history.entries()].map(([id, list]) => ({ id, list }));
   }

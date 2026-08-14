@@ -49,8 +49,9 @@ function runCommand(cmd, { cwd, timeout = 30000, whitelist } = {}) {
     const exec = cproc.exec(String(cmd), optsOf());
 
     function optsOf() {
+      const resolvedCwd = cwd && safeDir(cwd) ? path.resolve(cwd) : os.homedir();
       return {
-        cwd: cwd && safeDir(cwd) ? path.resolve(cwd) : os.homedir(),
+        cwd: resolvedCwd,
         timeout,
         maxBuffer: 10 * 1024 * 1024,
         windowsHide: true,
@@ -75,79 +76,67 @@ function runCommand(cmd, { cwd, timeout = 30000, whitelist } = {}) {
   });
 }
 
+/**
+ * Directory check - uses path.resolve for canonical path.
+ */
 function safeDir(p) {
+  if (!p) return false;
   try {
-    return fs.existsSync(p) && fs.statSync(p).isDirectory();
+    return fs.existsSync(path.resolve(p)) && fs.statSync(path.resolve(p)).isDirectory();
   } catch {
     return false;
   }
 }
 
 /**
- * Process list via systeminformation (already a dependency). Lightweight, no
- * child processes. Returns array of { pid, name, cpu, mem, command, user }.
+ * Returns the best cwd: home directory if it exists, otherwise process.cwd().
  */
-async function listProcesses() {
-  const si = require('systeminformation');
-  const data = await si.processes();
-  return (data.list || []).map((p) => ({
-    pid: p.pid,
-    name: p.name || '',
-    cpu: +(p.cpu || 0).toFixed(1),
-    mem: +(p.mem || 0).toFixed(1),
-    command: (p.command || '').slice(0, 300),
-    user: p.user || '',
-  }));
+function defaultCwd() {
+  const home = os.homedir();
+  return safeDir(home) ? home : process.cwd();
 }
 
 /**
- * Kills a process by pid. Windows uses taskkill, unix uses process.kill.
+ * File type detection based on extension.
  */
-async function killProcess(pid, signal) {
-  if (!pid || typeof pid !== 'number') throw new Error('pid missing');
-  if (os.platform() === 'win32') {
-    const r = cproc.execFileSync('taskkill', ['/PID', String(pid), '/T', '/F'], { windowsHide: true, stdio: 'pipe' });
-    return true;
-  }
+function getFileType(filePath) {
+  const ext = path.extname(filePath).toLowerCase();
+  const textExts = ['.txt', '.md', '.json', '.csv', '.log'];
+  const imageExts = ['.png', '.jpg', '.jpeg', '.gif', '.svg', '.webp'];
+  const videoExts = ['.mp4', '.mkv', '.avi', '.mov', '.wmv', '.flv'];
+  const codeExts = ['.html', '.css', '.js', '.py', '.java', '.c', '.cpp', '.ts'];
+  
+  if (textExts.includes(ext)) return 'text';
+  if (imageExts.includes(ext)) return 'image';
+  if (videoExts.includes(ext)) return 'video';
+  if (codeExts.includes(ext)) return 'code';
+  return 'file';
+}
+
+/**
+ * Reads a file safely, returning metadata + first chunk of content + type.
+ */
+function readFileSafe(filePath) {
   try {
-    process.kill(pid, signal || 'SIGTERM');
-  } catch (e) {
-    if (e.code === 'ESRCH') throw new Error(`no such process: ${pid}`);
-    throw e;
+    const target = path.resolve(filePath);
+    if (!fs.existsSync(target)) return null;
+    const buf = fs.readFileSync(target);
+    return {
+      content: buf.toString('utf8').substring(0, 10000),
+      type: getFileType(target),
+      size: buf.length,
+    };
+  } catch {
+    return null;
   }
-  return true;
 }
 
 /**
- * Directory listing. Resolves relative paths against the home dir.
- * Returns array of { name, type, size, mtime }.
+ * Reads a file and returns its base64 content + metadata.
  */
-function listDir(dir) {
-  const target = dir && dir.trim() ? path.resolve(dir) : os.homedir();
-  const stat = fs.statSync(target);
-  if (!stat.isDirectory()) throw new Error(`not a directory: ${target}`);
-  return fs.readdirSync(target, { withFileTypes: true }).map((d) => {
-    let size = 0;
-    let mtime = 0;
-    try {
-      const s = fs.statSync(path.join(target, d.name));
-      size = d.isFile() ? s.size : 0;
-      mtime = s.mtimeMs;
-    } catch {}
-    return {
-      name: d.name,
-      type: d.isDirectory() ? 'dir' : 'file',
-      size,
-      mtime,
-    };
-  });
-}
-
-/** Reads a file and returns its utf8-safe base64 content + metadata. */
 function readFile(file) {
-  const target = file && file.trim() ? path.resolve(file) : null;
+  const target = path.resolve(file);
   if (!target) throw new Error('missing file path');
-  const buf = fs.readFileSync(target);
   const stat = fs.statSync(target);
   return {
     name: path.basename(target),
@@ -155,25 +144,18 @@ function readFile(file) {
     size: buf.length,
     mtime: stat.mtimeMs,
     data: buf.toString('base64'),
+    type: getFileType(target),
   };
 }
 
 /** Writes (and optionally creates the parent dir) a file from base64 data. */
 function writeFile(file, base64) {
-  const target = file && file.trim() ? path.resolve(file) : null;
+  const target = path.resolve(file);
   if (!target) throw new Error('missing file path');
   if (typeof base64 !== 'string') throw new Error('missing data');
   fs.mkdirSync(path.dirname(target), { recursive: true });
   fs.writeFileSync(target, Buffer.from(base64, 'base64'));
   return { path: target, size: Buffer.from(base64, 'base64').length };
-}
-
-/**
- * Best-effort shell detection for the "run in background / batch" feature.
- * Same philosophy as agent.js: provide a real, existing shell per platform.
- */
-function defaultCwd() {
-  return safeDir(os.homedir()) ? os.homedir() : process.cwd();
 }
 
 module.exports = {

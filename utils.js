@@ -4,7 +4,7 @@ const path = require('path');
 
 function run(cmd, cwd) {
   return new Promise((res, rej) => {
-    exec(cmd, { cwd, maxBuffer: 10 * 1024 * 1024 }, (e, stdout, stderr) => {
+    exec(cmd, { cwd: cwd ? path.resolve(cwd) : os.homedir(), maxBuffer: 10 * 1024 * 1024 }, (e, stdout, stderr) => {
       if (e) {
         const err = new Error((stderr || e.message || String(e)).trim() || String(e));
         err.stdout = stdout;
