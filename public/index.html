@@ -606,6 +606,12 @@ function closeTerm() {
 
 socket.on('term-output', ({ termId: tid, data }) => { if (termApp && tid === termId) termApp.write(data); });
 socket.on('term-exit', () => closeTerm());
+socket.on('reconnect', () => {
+  if (termApp && termId) {
+    socket.emit('init-term', { agentId, termId, cols: termApp.cols, rows: termApp.rows });
+    logEntry('SYSTEM', 'Terminal reinitialized after reconnect', '');
+  }
+});
 socket.on('agent-list', renderAgents);
 socket.on('stats-update', updateAgentStats);
 socket.on('history-update', renderHistory);

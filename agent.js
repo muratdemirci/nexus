@@ -184,12 +184,6 @@ function startAgent(
     socket.on("disconnect", () => {
       if (timer) clearInterval(timer);
       if (netTimer) clearInterval(netTimer);
-      for (const [, child] of shells) {
-        try {
-          child.kill();
-        } catch {}
-      }
-      shells.clear();
       console.log("[Agent] connection lost, retrying...");
     });
 
