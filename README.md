@@ -2,6 +2,8 @@
 
 Nexus is a device management and remote terminal system built on a hub + agent architecture. The central server (hub) lists connected devices and shows their status; it provides terminal access, a file explorer, process manager, batch commands, alert notifications, and automatic updates.
 
+![Nexus dashboard](docs/nexus-thumbnail.png)
+
 ## Features
 
 - **Real-time monitoring** — CPU, RAM, disk, network, uptime (each agent uses `systeminformation`)
